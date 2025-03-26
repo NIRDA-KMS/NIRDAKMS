@@ -9,6 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 <link rel="stylesheet" href="../header.css">
+
+
+
 </head>
 <body>
     <nav class="navbar">
@@ -94,9 +97,11 @@
                     <a href="#" class="dropbtn"><i class="fas fa-users"></i> Collaboration</a>
                     <div class="dropdown-content">
                         <div class="nested-dropdown">
-                            <a href="#" class="nested-dropbtn"><i class="fas fa-calendar-alt"></i> Events</a>
+                        <a href="../SchedureEvent/schedule_event.php" class="nested-dropbtn">
+  <i class="fas fa-calendar-alt"></i> Events
+</a>
                             <div class="nested-dropdown-content">
-                                <a href="schedule_event.php" onclick="showContent('scheduleEvent')"><i class="fas fa-calendar-plus"></i> Schedule Event</a>
+                                <a href="../SchedureEvent/schedule_event.php" onclick="showContent('scheduleEvent')"><i class="fas fa-calendar-plus"></i> Schedule Event</a>
                                 <a href="manage_events.php" onclick="showContent('manageEvents')"><i class="fas fa-calendar-check"></i> Manage Events</a>
                             </div>
                         </div>
