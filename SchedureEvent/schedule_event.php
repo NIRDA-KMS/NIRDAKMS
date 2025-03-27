@@ -279,7 +279,7 @@
           <label for="endDateTime">
             <i class="fas fa-clock"></i> End Date & Time
           </label>
-          <input type="datetime-local" id="endDateTime" name="endDateTime" class="form-control" required>
+          <input type="datetime-local" id="endDateTime" name="endDateTime" class="form-control">
           <div class="invalid-feedback">Please select an end time</div>
         </div>
       </div>
