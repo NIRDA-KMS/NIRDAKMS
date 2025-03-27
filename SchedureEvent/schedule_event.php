@@ -371,100 +371,142 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-  $(document).ready(function() {
-    // Initialize sidebar toggle
+
+$(document).ready(function() {
+    // Sidebar and navigation initialization
     $('#sidebarCollapse').on('click', function(e) {
-      e.preventDefault();
-      $('#sidebar').toggleClass('active');
-      $('nav:not(.navbar)').toggleClass('sidebar-active');
-      $('.main-content').toggleClass('sidebar-active');
+        e.preventDefault();
+        $('#sidebar').toggleClass('active');
+        $('nav:not(.navbar)').toggleClass('sidebar-active');
+        $('.main-content').toggleClass('sidebar-active');
     });
     
     // Highlight current menu item
     $('.main-nav a[href="schedule_event.php"]').addClass('active');
+
+    // Real-time validation for all fields
+    $('#eventTitle').on('input', validateTitle);
+    $('#startDateTime, #endDateTime').on('change', validateDates);
+    $('#eventLocation').on('input', validateLocation);
     
-    // Form validation
+    // Form submission handler
     $('#eventForm').on('submit', function(e) {
-      e.preventDefault();
-      let isValid = true;
-      
-      // Reset validation
-      $('.form-control').removeClass('is-invalid');
-      $('.invalid-feedback').hide();
-      
-      // Validate required fields
-      const title = $('#eventTitle').val().trim();
-      const startTime = $('#startDateTime').val();
-      const endTime = $('#endDateTime').val();
-      
-      if (!title) {
-        $('#eventTitle').addClass('is-invalid').next('.invalid-feedback').show();
-        isValid = false;
-      }
-      
-      if (!startTime) {
-        $('#startDateTime').addClass('is-invalid').next('.invalid-feedback').show();
-        isValid = false;
-      }
-      
-      if (!endTime) {
-        $('#endDateTime').addClass('is-invalid').next('.invalid-feedback').show();
-        isValid = false;
-      }
-      
-      if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
-        $('#endDateTime').addClass('is-invalid').next('.invalid-feedback').text('End time must be after start time').show();
-        isValid = false;
-      }
-      
-      if (isValid) {
-        // AJAX form submission
-        $.ajax({
-          url: 'api/schedule_event.php',
-          type: 'POST',
-          data: $(this).serialize(),
-          beforeSend: function() {
-            $('.btn-primary').html('<i class="fas fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
-          },
-          success: function(response) {
-            if (response.success) {
-              alert('Event scheduled successfully!');
-              window.location.href = 'events.php';
-            } else {
-              alert('Error: ' + response.message);
-              $('.btn-primary').html('<i class="fas fa-calendar-plus"></i> Create Event').prop('disabled', false);
-            }
-          },
-          error: function() {
-            alert('An error occurred. Please try again.');
-            $('.btn-primary').html('<i class="fas fa-calendar-plus"></i> Create Event').prop('disabled', false);
-          }
-        });
-      }
+        e.preventDefault();
+        
+        // Validate all fields
+        const isTitleValid = validateTitle();
+        const areDatesValid = validateDates();
+        const isLocationValid = validateLocation();
+        
+        if (isTitleValid && areDatesValid && isLocationValid) {
+            submitForm();
+        }
     });
     
     // Cancel button
     $('#cancelBtn').on('click', function() {
-      if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-        window.location.href = 'events.php';
-      }
+        if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+            window.location.href = 'events.php';
+        }
     });
     
     // Auto-adjust for footer height
     function adjustForFooter() {
-      const footerHeight = $('.footer').outerHeight();
-      $('.main-content').css('padding-bottom', footerHeight + 20);
+        const footerHeight = $('.footer').outerHeight();
+        $('.main-content').css('padding-bottom', footerHeight + 20);
     }
     
     adjustForFooter();
     $(window).resize(adjustForFooter);
-  });
 
-
-
-
-
-
+    // Field validation functions
+    function validateTitle() {
+        const title = $('#eventTitle').val().trim();
+        const isValid = title.length > 0;
+        
+        $('#eventTitle').toggleClass('is-invalid', !isValid);
+        $('#eventTitle').next('.invalid-feedback').toggle(!isValid);
+        
+        return isValid;
+    }
+    
+    function validateDates() {
+        const startTime = $('#startDateTime').val();
+        const endTime = $('#endDateTime').val();
+        let isValid = true;
+        
+        // Validate start time
+        if (!startTime) {
+            $('#startDateTime').addClass('is-invalid');
+            $('#startDateTime').next('.invalid-feedback').text('Please select a start time').show();
+            isValid = false;
+        } else {
+            $('#startDateTime').removeClass('is-invalid');
+            $('#startDateTime').next('.invalid-feedback').hide();
+        }
+        
+        // Validate end time
+        if (!endTime) {
+            $('#endDateTime').addClass('is-invalid');
+            $('#endDateTime').next('.invalid-feedback').text('Please select an end time').show();
+            isValid = false;
+        } else {
+            $('#endDateTime').removeClass('is-invalid');
+            $('#endDateTime').next('.invalid-feedback').hide();
+        }
+        
+        // Validate date range if both exist
+        if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
+            $('#endDateTime').addClass('is-invalid');
+            $('#endDateTime').next('.invalid-feedback').text('End time must be after start time').show();
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+    
+    function validateLocation() {
+        const location = $('#eventLocation').val().trim();
+        const isValid = location.length > 0;
+        
+        $('#eventLocation').toggleClass('is-invalid', !isValid);
+        
+        // Create or update feedback element
+        let feedback = $('#eventLocation').next('.invalid-feedback');
+        if (feedback.length === 0) {
+            feedback = $('<div class="invalid-feedback">Please provide a location</div>');
+            $('#eventLocation').after(feedback);
+        }
+        feedback.toggle(!isValid);
+        
+        return isValid;
+    }
+    
+    function submitForm() {
+        // AJAX form submission
+        $.ajax({
+            url: 'api/schedule_event.php',
+            type: 'POST',
+            data: $('#eventForm').serialize(),
+            beforeSend: function() {
+                $('.btn-primary').html('<i class="fas fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Event scheduled successfully!');
+                    window.location.href = 'events.php';
+                } else {
+                    alert('Error: ' + response.message);
+                    $('.btn-primary').html('<i class="fas fa-calendar-plus"></i> Create Event').prop('disabled', false);
+                }
+            },
+            error: function() {
+                alert('An error occurred. Please try again.');
+                $('.btn-primary').html('<i class="fas fa-calendar-plus"></i> Create Event').prop('disabled', false);
+            }
+        });
+    }
+});
 
 
 
