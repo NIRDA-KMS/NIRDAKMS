@@ -261,7 +261,7 @@
         <label for="eventTitle">
           <i class="fas fa-heading"></i> Event Title
         </label>
-        <input type="text" id="eventTitle" name="eventTitle" class="form-control" required>
+        <input type="text" id="eventTitle" name="eventTitle" class="form-control" >
         <div class="invalid-feedback">Please provide an event title</div>
       </div>
       
@@ -271,7 +271,7 @@
           <label for="startDateTime">
             <i class="fas fa-calendar"></i> Start Date & Time
           </label>
-          <input type="datetime-local" id="startDateTime" name="startDateTime" class="form-control" required>
+          <input type="datetime-local" id="startDateTime" name="startDateTime" class="form-control" >
           <div class="invalid-feedback">Please select a start time</div>
         </div>
         
