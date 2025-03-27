@@ -9,11 +9,42 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 <link rel="stylesheet" href="../header.css">
-
-
-
 </head>
 <body>
+
+
+
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarCollapse');
+    
+    toggleBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        sidebar.classList.toggle('active');
+        document.body.classList.toggle('sidebar-open');
+        
+        // Close when clicking outside (optional)
+        if (sidebar.classList.contains('active')) {
+            document.addEventListener('click', closeSidebar);
+        } else {
+            document.removeEventListener('click', closeSidebar);
+        }
+    });
+    
+    function closeSidebar(e) {
+        if (!sidebar.contains(e.target) && e.target !== toggleBtn && !toggleBtn.contains(e.target)) {
+            sidebar.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
+            document.removeEventListener('click', closeSidebar);
+        }
+    }
+});
+</script>
     <nav class="navbar">
         <div class="navbar-brand">
             <a href="#" id="sidebarCollapse" style="padding-right: 40px;">
@@ -130,6 +161,8 @@
                             </div>
                         </div>
                     </div>
+
+                    
                 </li>
                 <li class="dropdown">
                     <a href="#" class="dropbtn"><i class="fas fa-chart-bar"></i> Analytics</a>
@@ -229,7 +262,21 @@
     <div class="main-content">
         <!-- Your main content goes here -->
     </div>
+    
+<footer class="footer">
+        <div class="contact-info">
+            <div><i class="fas fa-map-marker-alt"></i> Kigali City Tower, 13th Floor</div>
+            <div><i class="fas fa-envelope"></i> 273 Kigali</div>
+            <div><i class="fas fa-phone-alt"></i> +250 255104465</div>
+            <div><i class="fas fa-envelope-open"></i> info@nirda.gov.rw</div>
+            <div><i class="fas fa-globe"></i> www.nirda.gov.rw</div>
+        </div>
+    </footer>
 
+    <script>
+        console.log("Fixed footer loaded successfully");
+    </script>
+    </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     $(document).ready(function() {
@@ -264,5 +311,6 @@
         });
     });
 </script>
+
 </body>
 </html>
