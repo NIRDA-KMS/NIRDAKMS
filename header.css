@@ -324,7 +324,7 @@ top: 85px; /* Position when notice bar is visible */
 .main-content {
     margin-left: 0;
     transition: 0.3s;
-    padding-top: 135px;
+    padding-top: 10px;
 }
 
 .main-content.active {
@@ -401,10 +401,9 @@ body, html {
     background-color: #00a1e4;
     color: white;
     text-align: center;
-    padding: 20px 10px;
     position: fixed; /* Change to fixed if needed */
     bottom: 0;
-    width: 50px;
+    width: 100%;
     z-index: 1000;
 }
 
