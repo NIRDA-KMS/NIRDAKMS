@@ -177,7 +177,7 @@
       display: none;
       position: fixed;
       z-index: 2000;
-      left: 0;
+      left: 300px;
       top: 0;
       width: 100%;
       height: 100%;

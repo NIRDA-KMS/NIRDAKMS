@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <li class="dropdown">
                     <a href="#" class="dropbtn"><i class="fas fa-user-cog"></i> Users</a>
                     <div class="dropdown-content">
-                        <a href="add_user.php" onclick="showContent('addUser')"><i class="fas fa-user-plus"></i> Add User</a>
+                        <a href="../Internees' task/Users/add_user.php" onclick="showContent('addUser')"><i class="fas fa-user-plus"></i> Add User</a>
                         <a href="add_role.php" onclick="showContent('addRole')"><i class="fas fa-user-plus"></i> Add Role</a>
                         <a href="manage_users.php" onclick="showContent('manageUser')"><i class="fas fa-user-cog"></i> Manage Users</a>
                         <a href="manage_Roles.php" onclick="showContent('manageRoles')"><i class="fas fa-users-cog"></i> Manage Roles</a>

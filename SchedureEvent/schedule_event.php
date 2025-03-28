@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -299,20 +300,10 @@
         </label>
         <textarea id="eventDescription" name="eventDescription" rows="5" class="form-control" placeholder="Enter event details..."></textarea>
       </div>
-      
-      <!-- Attendees -->
-      <div class="form-group">
-        <label>
-          <i class="fas fa-users"></i> Invite Attendees
-        </label>
-        <select id="eventAttendees" name="eventAttendees" multiple class="form-control">
-          <option value="user1">John Doe (Marketing)</option>
-          <option value="user2">Jane Smith (Development)</option>
-          <option value="user3">Mike Johnson (HR)</option>
-          <option value="user4">Sarah Williams (Finance)</option>
-        </select>
-        <small class="text-muted" style="color: #6b7280;">Hold Ctrl/Cmd to select multiple attendees</small>
-      </div>
+      <label for="attendees">Invite attendees</label>
+      <input type="text" id="eventTitle" name="attend" class="form-control" >
+
+     
       
       <!-- Recurring Options -->
       <div class="form-group">
@@ -361,7 +352,7 @@
         <button type="button" class="btn btn-secondary" id="cancelBtn">
           <i class="fas fa-times"></i> Cancel
         </button>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" name="submit">
           <i class="fas fa-calendar-plus"></i> Create Event
         </button>
       </div>
@@ -371,7 +362,6 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-
 $(document).ready(function() {
     // Sidebar and navigation initialization
     $('#sidebarCollapse').on('click', function(e) {
