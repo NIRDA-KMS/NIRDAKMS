@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </a>
                             <div class="nested-dropdown-content">
                                 <a href="../SchedureEvent/schedule_event.php" onclick="showContent('scheduleEvent')"><i class="fas fa-calendar-plus"></i> Schedule Event</a>
-                                <a href="manage_events.php" onclick="showContent('manageEvents')"><i class="fas fa-calendar-check"></i> Manage Events</a>
+                                <a href="../SchedureEvent/manage_events.php" onclick="showContent('manageEvents')"><i class="fas fa-calendar-check"></i> Manage Events</a>
                             </div>
                         </div>
                         <div class="nested-dropdown">
