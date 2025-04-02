@@ -1,3 +1,35 @@
+
+
+<?php
+include('connect.php');
+
+header('Content-Type: application/json');
+
+if (!isset($_GET['id'])) {
+    echo json_encode(['success' => false, 'message' => 'Event ID not provided']);
+    exit;
+}
+
+$eventId = intval($_GET['id']);
+$query = "SELECT * FROM schedule_events WHERE event_id = ?";
+$stmt = mysqli_prepare($connection, $query);
+mysqli_stmt_bind_param($stmt, "i", $eventId);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+
+if ($event = mysqli_fetch_assoc($result)) {
+    echo json_encode(['success' => true, 'event' => $event]);
+} else {
+    echo json_encode(['success' => false, 'message' => 'Event not found']);
+}
+
+mysqli_close($connection);
+?>
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +40,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
   <style>
+
     /* Color Variables */
     :root {
       --primary-color: #1a237e;
