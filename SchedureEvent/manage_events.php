@@ -93,15 +93,14 @@ function getEventStatus($start, $end, $isActive = 1) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<<<<<<< HEAD
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Events | NIRDA Knowledge Management System</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
   <style>
-
     /* Color Variables */
     :root {
       --primary-color: #1a237e;
@@ -111,6 +110,10 @@ function getEventStatus($start, $end, $isActive = 1) {
       --text-color: #333333;
       --light-text: #ffffff;
       --border-color: #d1d5db;
+      --success-color: #4CAF50;
+      --warning-color: #FFC107;
+      --danger-color: #F44336;
+      --info-color: #2196F3;
     } 
 
     /* Base Styles */
@@ -121,6 +124,76 @@ function getEventStatus($start, $end, $isActive = 1) {
       margin: 0;
       padding: 0;
       line-height: 1.6;
+      transition: all 0.3s;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      min-width: 250px;
+      max-width: 250px;
+      background: var(--primary-color);
+      color: white;
+      transition: all 0.3s;
+      position: fixed;
+      height: 100vh;
+      z-index: 1000;
+      left: -250px;
+    }
+
+    .sidebar.active {
+      left: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      background: var(--secondary-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h3 {
+      margin: 0;
+      color: white;
+    }
+
+    #sidebarCollapse {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .sidebar ul.components {
+      padding: 20px 0;
+      list-style: none;
+      margin: 0;
+    }
+
+    .sidebar ul li a {
+      padding: 10px 20px;
+      color: white;
+      display: block;
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+
+    .sidebar ul li a:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar ul li a.active {
+      background: var(--accent-color);
+    }
+
+    .sidebar ul li a i {
+      margin-right: 10px;
+    }
+
+    /* When sidebar is active, add padding to body */
+    body.sidebar-open {
+      padding-left: 250px;
     }
 
     /* Main Content */
@@ -135,189 +208,240 @@ function getEventStatus($start, $end, $isActive = 1) {
     }
 
     /* Content Container */
-    .content-container {
+    .container {
       max-width: 1200px;
       margin: 20px auto;
       background-color: white;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      padding: 100px;
+      padding: 20px;
     }
 
-    /* View Tabs */
-    .view-tabs {
-      display: flex;
-      border-bottom: 1px solid var(--border-color);
+    h1 {
+      color: var(--primary-color);
       margin-bottom: 20px;
     }
 
-    .view-tab {
-      padding: 10px 20px;
+    /* View Switcher */
+    .view-switcher {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .view-btn {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      margin-right: 10px;
+      border-radius: 4px;
       cursor: pointer;
-      border-bottom: 3px solid transparent;
-      font-weight: 500;
+      transition: background-color 0.3s;
     }
 
-    .view-tab.active {
-      border-bottom-color: var(--accent-color);
-      color: var(--primary-color);
-    }
-
-    .view-tab:hover:not(.active) {
-      background-color: var(--background-color);
-    }
-
-    /* View Containers */
-    .view-container {
-      display: none;
-    }
-
-    .view-container.active {
-      display: block;
-    }
-
-    /* Data Table */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .data-table th, .data-table td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .data-table th {
+    .view-btn:hover {
       background-color: var(--primary-color);
-      color: var(--light-text);
-      font-weight: 500;
     }
 
-    .data-table tr:hover {
-      background-color: var(--background-color);
+    .view-btn.active {
+      background-color: var(--primary-color);
     }
 
     /* Status Badges */
     .status-badge {
-      display: inline-block;
       padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.8rem;
+      border-radius: 12px;
+      font-size: 12px;
       font-weight: 500;
+      color: white;
+    }
+
+    .status-upcoming {
+      background-color: var(--info-color);
     }
 
     .status-active {
-      background-color: #d4edda;
-      color: #155724;
+      background-color: var(--success-color);
+    }
+
+    .status-completed {
+      background-color: var(--secondary-color);
     }
 
     .status-inactive {
-      background-color: #f8d7da;
-      color: #721c24;
+      background-color: var(--danger-color);
     }
 
     /* Action Buttons */
     .action-btn {
-      padding: 5px 10px;
-      border-radius: 4px;
-      border: none;
-      cursor: pointer;
-      font-size: 0.85rem;
-      margin-right: 5px;
-      transition: all 0.2s;
-    }
-
-    .action-btn i {
-      margin-right: 5px;
-    }
-
-    .btn-edit {
-      background-color: #ffc107;
-      color: #212529;
-    }
-
-    .btn-delete {
-      background-color: #dc3545;
-      color: white;
-    }
-
-    .btn-deactivate {
-      background-color: #6c757d;
-      color: white;
-    }
-
-    .btn-view {
       background-color: var(--accent-color);
       color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
     }
 
-    .btn-remind {
-      background-color: #28a745;
-      color: white;
+    /* Dropdown */
+    .dropdown {
+      position: relative;
+      display: inline-block;
     }
 
-    /* Calendar */
-    #calendar {
-      margin-top: 20px;
+    .dropdown-content {
+      display: none;
+      position: absolute;
       background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      padding: 20px;
+      min-width: 160px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      z-index: 1;
+      border-radius: 4px;
+    }
+
+    .dropdown-content a {
+      color: var(--text-color);
+      padding: 8px 12px;
+      text-decoration: none;
+      display: block;
+    }
+
+    .dropdown-content a:hover {
+      background-color: var(--background-color);
+    }
+
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+
+    /* Pagination */
+    .pagination {
+      margin-top: 20px;
+    }
+
+    .pagination a {
+      color: var(--primary-color);
+      padding: 8px 16px;
+      text-decoration: none;
+      border: 1px solid #ddd;
+      margin: 0 4px;
+    }
+
+    .pagination a.active {
+      background-color: var(--primary-color);
+      color: white;
+      border: 1px solid var(--primary-color);
+    }
+
+    .pagination a:hover:not(.active) {
+      background-color: #ddd;
     }
 
     /* Modal */
     .modal {
       display: none;
       position: fixed;
-      z-index: 2000;
-      left: 300px;
+      z-index: 1000;
+      left: 0;
       top: 0;
       width: 100%;
       height: 100%;
       background-color: rgba(0,0,0,0.5);
     }
-    .manage-options {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
 
-.manage-options .action-btn {
-  width: 80%;
-  text-align: left;
-}
     .modal-content {
       background-color: white;
       margin: 10% auto;
       padding: 20px;
       border-radius: 8px;
-      width: 20%;
+      width: 60%;
       max-width: 800px;
-      box-shadow: 0 0px 10px rgba(0,0,0,0.1);
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 15px;
-      margin-bottom: 15px;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      color: var(--primary-color);
-      margin: 0;
     }
 
     .close-modal {
-      background: none;
-      border: none;
-      font-size: 1.5rem;
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
       cursor: pointer;
-      color: var(--secondary-color);
+    }
+
+    .close-modal:hover {
+      color: black;
+    }
+
+    /* Calendar View */
+    #calendarView {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .fc-event-main {
+      padding: 2px 5px;
+      border-radius: 3px;
+      color: white;
+    }
+
+    /* Attendee List */
+    .attendee-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .rsvp-status {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: white;
+    }
+
+    .rsvp-confirmed {
+      background-color: var(--success-color);
+    }
+
+    .rsvp-declined {
+      background-color: var(--danger-color);
+    }
+
+    .rsvp-pending {
+      background-color: var(--warning-color);
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      margin-right: -15px;
+      margin-left: -15px;
+    }
+
+    .form-group.col-md-6 {
+      flex: 0 0 50%;
+      max-width: 50%;
+      padding-right: 15px;
+      padding-left: 15px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
     }
 
     /* Responsive Styles */
@@ -325,263 +449,32 @@ function getEventStatus($start, $end, $isActive = 1) {
       .main-content.sidebar-active {
         margin-left: 0;
       }
+      
+      body.sidebar-open {
+        padding-left: 0;
+      }
     }
 
     @media (max-width: 768px) {
-      .data-table {
-        display: block;
-        overflow-x: auto;
+      .container {
+        padding: 10px;
       }
       
       .modal-content {
-        width: 95%;
+        width: 90%;
         margin: 20% auto;
       }
+      
+      .form-group.col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+      }
     }
-
-
-    
   </style>
-=======
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Management | NIRDA KMS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
-    <style>
-        :root {
-            --primary-color: #1a237e;
-            --secondary-color: #2c3e50;
-            --accent-color: #00A0DF;
-            --background-color: #f0f2f5;
-            --text-color: #333333;
-            --light-text: #ffffff;
-            --success-color: #4CAF50;
-            --warning-color: #FFC107;
-            --danger-color: #F44336;
-            --info-color: #2196F3;
-        }
-        
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-        }
-        
-        .main-content {
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 20px;
-        }
-        
-        h1 {
-            color: var(--primary-color);
-            margin-bottom: 20px;
-        }
-        
-        .view-switcher {
-            margin-bottom: 20px;
-        }
-        
-        .view-btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            margin-right: 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        
-        .view-btn:hover {
-            background-color: var(--primary-color);
-        }
-        
-        .view-btn.active {
-            background-color: var(--primary-color);
-        }
-        
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            color: white;
-        }
-        
-        .status-upcoming {
-            background-color: var(--info-color);
-        }
-        
-        .status-active {
-            background-color: var(--success-color);
-        }
-        
-        .status-completed {
-            background-color: var(--secondary-color);
-        }
-        
-        .status-inactive {
-            background-color: var(--danger-color);
-        }
-        
-        .action-btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .dropdown {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: white;
-            min-width: 160px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            z-index: 1;
-            border-radius: 4px;
-        }
-        
-        .dropdown-content a {
-            color: var(--text-color);
-            padding: 8px 12px;
-            text-decoration: none;
-            display: block;
-        }
-        
-        .dropdown-content a:hover {
-            background-color: var(--background-color);
-        }
-        
-        .dropdown:hover .dropdown-content {
-            display: block;
-        }
-        
-        .pagination {
-            margin-top: 20px;
-        }
-        
-        .pagination a {
-            color: var(--primary-color);
-            padding: 8px 16px;
-            text-decoration: none;
-            border: 1px solid #ddd;
-            margin: 0 4px;
-        }
-        
-        .pagination a.active {
-            background-color: var(--primary-color);
-            color: white;
-            border: 1px solid var(--primary-color);
-        }
-        
-        .pagination a:hover:not(.active) {
-            background-color: #ddd;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 60%;
-            max-width: 800px;
-        }
-        
-        .close-modal {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close-modal:hover {
-            color: black;
-        }
-        
-        #calendarView {
-            display: none;
-            margin-top: 20px;
-        }
-        
-        .fc-event-main {
-            padding: 2px 5px;
-            border-radius: 3px;
-            color: white;
-        }
-        
-        .attendee-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .rsvp-status {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            color: white;
-        }
-        
-        .rsvp-confirmed {
-            background-color: var(--success-color);
-        }
-        
-        .rsvp-declined {
-            background-color: var(--danger-color);
-        }
-        
-        .rsvp-pending {
-            background-color: var(--warning-color);
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .modal-content {
-                width: 90%;
-                margin: 20% auto;
-            }
-        }
-    </style>
->>>>>>> 5870fc1 (manage event)
 </head>
 <body>
 <?php include_once("../Internees' task/header.php"); ?>
+
 
 <div class="main-content">
     <div class="container">
@@ -1114,42 +1007,41 @@ $(document).ready(function() {
     }
 });
 
-
-
-// Sidebar Toggle Functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarCollapse');
+// // Sidebar Toggle Functionality
+// document.addEventListener('DOMContentLoaded', function() {
+//     const sidebar = document.getElementById('sidebar');
+//     const toggleBtn = document.getElementById('sidebarCollapse');
     
-    // Initialize from localStorage
-    if(localStorage.getItem('sidebarState') === 'open') {
-        sidebar.classList.add('active');
-        document.body.classList.add('sidebar-open');
-        document.querySelector('.main-content')?.classList.add('sidebar-active');
-    }
+//     // Initialize from localStorage
+//     if(localStorage.getItem('sidebarState') === 'open') {
+//         sidebar.classList.add('active');
+//         document.body.classList.add('sidebar-open');
+//         document.querySelector('.main-content').classList.add('sidebar-active');
+//     }
     
-    // Toggle sidebar
-    if(toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const isOpening = !sidebar.classList.contains('active');
+//     // Toggle sidebar
+//     if(toggleBtn) {
+//         toggleBtn.addEventListener('click', function(e) {
+//             e.preventDefault();
+//             const isOpening = !sidebar.classList.contains('active');
             
-            sidebar.classList.toggle('active');
-            document.body.classList.toggle('sidebar-open');
-            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
+//             sidebar.classList.toggle('active');
+//             document.body.classList.toggle('sidebar-open');
+//             document.querySelector('.main-content').classList.toggle('sidebar-active');
             
-            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
-        });
-    }
+//             localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
+//         });
+//     }
     
-    // Highlight current page in sidebar
-    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        if(link.getAttribute('href').includes(currentPage)) {
-            link.classList.add('active');
-        }
-    });
-});
+//     // Highlight current page in sidebar
+//     const currentPage = window.location.pathname.split('/').pop() || 'index.php';
+//     document.querySelectorAll('.sidebar a').forEach(link => {
+//         const linkHref = link.getAttribute('href').split('/').pop();
+//         if (linkHref === currentPage) {
+//             link.classList.add('active');
+//         }
+//     });
+// });
 </script>
 </body>
 </html>
