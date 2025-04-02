@@ -50,7 +50,7 @@ mysqli_close($connection);
       --text-color: #333333;
       --light-text: #ffffff;
       --border-color: #d1d5db;
-    }
+    } 
 
     /* Base Styles */
     body {
