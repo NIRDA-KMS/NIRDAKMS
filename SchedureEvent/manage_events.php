@@ -481,7 +481,7 @@ function getEventStatus($start, $end, $isActive = 1) {
         <h1><i class="fas fa-calendar-alt"></i> Event Management</h1>
         
         <div class="view-switcher">
-            <button id="tableViewBtn" class="view-btn active"><i class="fas fa-table"></i> Table View</button>
+            <button id="tableViewBtn" class="view-btn active"><i class="fas fa-table"></i> List View</button>
             <button id="calendarViewBtn" class="view-btn"><i class="fas fa-calendar"></i> Calendar View</button>
             <button id="addEventBtn" class="view-btn" style="float: right;"><i class="fas fa-plus"></i> Add Event</button>
         </div>
