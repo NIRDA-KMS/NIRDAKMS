@@ -183,15 +183,24 @@
       height: 100%;
       background-color: rgba(0,0,0,0.5);
     }
+    .manage-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
+.manage-options .action-btn {
+  width: 80%;
+  text-align: left;
+}
     .modal-content {
       background-color: white;
       margin: 10% auto;
       padding: 20px;
       border-radius: 8px;
-      width: 80%;
-      max-width: 700px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      width: 20%;
+      max-width: 800px;
+      box-shadow: 0 0px 10px rgba(0,0,0,0.1);
     }
 
     .modal-header {
@@ -268,52 +277,49 @@ include_once("../Internees' task/header.php");
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td>Quarterly Review Meeting</td>
-            <td>Jun 15, 2023 - 10:00 AM to 12:00 PM</td>
-            <td>Conference Room A</td>
-            <td><span class="status-badge status-active">Active</span></td>
-            <td>
-              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
-              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
-              <button class="action-btn btn-deactivate"><i class="fas fa-eye-slash"></i> Deactivate</button>
-              <button class="action-btn btn-view"><i class="fas fa-users"></i> Attendees</button>
-              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
-            </td>
-          </tr>
-          <tr>
-            <td>Project Deadline</td>
-            <td>Jun 30, 2023 - All Day</td>
-            <td>Virtual</td>
-            <td><span class="status-badge status-inactive">Inactive</span></td>
-            <td>
-              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
-              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
-              <button class="action-btn btn-deactivate"><i class="fas fa-eye"></i> Activate</button>
-              <button class="action-btn btn-view"><i class="fas fa-users"></i> View Attendees</button>
-              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
-            </td>
-          </tr>
-        </tbody>
-          <tr>
-            <td>Project Deadline</td>
-            <td>Jun 30, 2023 - All Day</td>
-            <td>Virtual</td>
-            <td><span class="status-badge status-inactive">Inactive</span></td>
-            <td>
-              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
-              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
-              <button class="action-btn btn-deactivate"><i class="fas fa-eye"></i> Activate</button>
-              <button class="action-btn btn-view"><i class="fas fa-users"></i> View Attendees</button>
-              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
-            </td>
-          </tr>
-        </tbody>
+        
+<tbody>
+  <tr>
+    <td>Quarterly Review Meeting</td>
+    <td>Jun 15, 2023 - 10:00 AM to 12:00 PM</td>
+    <td>Conference Room A</td>
+    <td><span class="status-badge status-active">Active</span></td>
+    <td>
+      <button class="action-btn btn-manage" data-event-id="1"><i class="fas fa-cogs"></i> Manage</button>
+    </td>
+  </tr>
+  <tr>
+    <td>Project Deadline</td>
+    <td>Jun 30, 2023 - All Day</td>
+    <td>Virtual</td>
+    <td><span class="status-badge status-inactive">Inactive</span></td>
+    <td>
+      <button class="action-btn btn-manage" data-event-id="2"><i class="fas fa-cogs"></i> Manage</button>
+    </td>
+  </tr>
+</tbody>
       </table>
     </div>
-
+<!-- manage Modal -->
     
+<div class="modal" id="manageModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-cogs"></i> Manage Event</h3>
+      <button class="close-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="event-title"></p>
+      <div class="manage-options">
+        <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
+        <button class="action-btn btn-deactivate"><i class="fas fa-eye-slash"></i> Deactivate</button>
+        <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
+        <button class="action-btn btn-view"><i class="fas fa-users"></i> Attendees</button>
+        <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
+      </div>
+    </div>
+  </div>
+</div>
     
     <!-- Calendar View -->
     <div class="view-container" id="calendar-view">
@@ -392,7 +398,28 @@ include_once("../Internees' task/header.php");
       $('.view-container').removeClass('active');
       $('#' + view).addClass('active');
     });
-    
+    // Manage botton
+    $(document).ready(function () {
+    // Handle "Manage" button click
+    $('.btn-manage').on('click', function () {
+      const eventId = $(this).data('event-id');
+      const eventTitle = $(this).closest('tr').find('td:first').text();
+
+      // Populate modal with event details
+      $('#event-title').text(`Manage Options for: ${eventTitle}`);
+      $('#manageModal').show();
+    });
+
+    // Close modal
+    $('.close-modal').on('click', function () {
+      $('#manageModal').hide();
+    });
+    $(window).on('click', function (e) {
+      if ($(e.target).is('.modal')) {
+        $('.modal').hide();
+      }
+    });
+  });
     // Initialize calendar
     const calendarEl = document.getElementById('calendar');
     const calendar = new FullCalendar.Calendar(calendarEl, {
