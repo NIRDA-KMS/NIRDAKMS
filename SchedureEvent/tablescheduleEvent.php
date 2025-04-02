@@ -2,16 +2,17 @@
 include 'connect.php';
 
 // SQL to create events table
-$sql = "CREATE TABLE IF NOT EXISTS schedule_events (
+$sql = "CREATE TABLE  schedule_events (
     event_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    description TEXT ,
-    start_datetime DATETIME NOT NULL,
-    end_datetime DATETIME NOT NULL,
-    location VARCHAR(255),
-    location_type ENUM('physical', 'virtual') DEFAULT 'physical',
-    is_recurring TINYINT(1) DEFAULT 0,
-    recurrence_pattern VARCHAR(50)
+    eventTitle VARCHAR(100) NOT NULL,
+    startDateTime DATETIME NOT NULL,
+    endingDateTime DATETIME NOT NULL,
+    eventLocation TEXT ,
+    eventDescription VARCHAR(255),
+    attend TEXT,
+    emailReminder VARCHAR(50),
+   appReminder VARCHAR(100),
+   reminderTime INT
    )";
 // Execute query
 if (mysqli_query($connection, $sql)) {
