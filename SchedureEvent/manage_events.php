@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <?php
 // Enable error reporting
 error_reporting(E_ALL);
@@ -90,6 +91,8 @@ function getEventStatus($start, $end, $isActive = 1) {
 }
 ?>
 
+=======
+>>>>>>> Stashed changes
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,11 +113,15 @@ function getEventStatus($start, $end, $isActive = 1) {
       --text-color: #333333;
       --light-text: #ffffff;
       --border-color: #d1d5db;
+<<<<<<< Updated upstream
       --success-color: #4CAF50;
       --warning-color: #FFC107;
       --danger-color: #F44336;
       --info-color: #2196F3;
     } 
+=======
+    }
+>>>>>>> Stashed changes
 
     /* Base Styles */
     body {
@@ -354,8 +361,29 @@ function getEventStatus($start, $end, $isActive = 1) {
       margin: 10% auto;
       padding: 20px;
       border-radius: 8px;
+<<<<<<< Updated upstream
       width: 60%;
       max-width: 800px;
+=======
+      width: 80%;
+      max-width: 700px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 15px;
+      margin-bottom: 15px;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      color: var(--primary-color);
+      margin: 0;
+>>>>>>> Stashed changes
     }
 
     .close-modal {
@@ -477,6 +505,7 @@ function getEventStatus($start, $end, $isActive = 1) {
 
 
 <div class="main-content">
+<<<<<<< Updated upstream
     <div class="container">
         <h1><i class="fas fa-calendar-alt"></i> Event Management</h1>
         
@@ -573,6 +602,79 @@ function getEventStatus($start, $end, $isActive = 1) {
         <div id="modalContent">
             <!-- Content will be loaded dynamically -->
         </div>
+=======
+  <div class="content-container">
+    <h2><i class="fas fa-calendar-alt"></i> Manage Events</h2>
+    
+    <!-- View Tabs -->
+    <div class="view-tabs">
+      <div class="view-tab active" data-view="list-view">List View</div>
+      <div class="view-tab" data-view="calendar-view">Calendar View</div>
+    </div>
+    
+    <!-- List View -->
+    <div class="view-container active" id="list-view">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Date & Time</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Quarterly Review Meeting</td>
+            <td>Jun 15, 2023 - 10:00 AM to 12:00 PM</td>
+            <td>Conference Room A</td>
+            <td><span class="status-badge status-active">Active</span></td>
+            <td>
+              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
+              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
+              <button class="action-btn btn-deactivate"><i class="fas fa-eye-slash"></i> Deactivate</button>
+              <button class="action-btn btn-view"><i class="fas fa-users"></i> Attendees</button>
+              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
+            </td>
+          </tr>
+          <tr>
+            <td>Project Deadline</td>
+            <td>Jun 30, 2023 - All Day</td>
+            <td>Virtual</td>
+            <td><span class="status-badge status-inactive">Inactive</span></td>
+            <td>
+              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
+              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
+              <button class="action-btn btn-deactivate"><i class="fas fa-eye"></i> Activate</button>
+              <button class="action-btn btn-view"><i class="fas fa-users"></i> View Attendees</button>
+              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
+            </td>
+          </tr>
+        </tbody>
+          <tr>
+            <td>Project Deadline</td>
+            <td>Jun 30, 2023 - All Day</td>
+            <td>Virtual</td>
+            <td><span class="status-badge status-inactive">Inactive</span></td>
+            <td>
+              <button class="action-btn btn-edit"><i class="fas fa-edit"></i> Edit</button>
+              <button class="action-btn btn-delete"><i class="fas fa-trash"></i> Delete</button>
+              <button class="action-btn btn-deactivate"><i class="fas fa-eye"></i> Activate</button>
+              <button class="action-btn btn-view"><i class="fas fa-users"></i> View Attendees</button>
+              <button class="action-btn btn-remind"><i class="fas fa-bell"></i> Remind</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    
+    
+    <!-- Calendar View -->
+    <div class="view-container" id="calendar-view">
+      <div id="calendar"></div>
+>>>>>>> Stashed changes
     </div>
 </div>
 
@@ -659,6 +761,7 @@ $(document).ready(function() {
         $('#calendarViewBtn').removeClass('active');
     });
     
+<<<<<<< Updated upstream
     $('#calendarViewBtn').click(function() {
         $('#tableView').hide();
         $('#calendarView').show();
@@ -714,6 +817,35 @@ $(document).ready(function() {
     $(window).click(function(event) {
         if ($(event.target).hasClass('modal')) {
             $('.modal').hide();
+=======
+    // Initialize calendar
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      events: [
+        {
+          title: 'Quarterly Review Meeting',
+          start: '2023-06-15T10:00:00',
+          end: '2023-06-15T12:00:00',
+          color: '#1a237e'
+        },
+        {
+          title: 'Team Building Workshop',
+          start: '2023-06-20T09:00:00',
+          end: '2023-06-20T17:00:00',
+          color: '#00A0DF'
+        },
+        {
+          title: 'Project Deadline',
+          start: '2023-06-30',
+          color: '#2c3e50',
+          allDay: true
+>>>>>>> Stashed changes
         }
     });
     

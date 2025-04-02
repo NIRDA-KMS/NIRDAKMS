@@ -391,6 +391,7 @@ mysqli_close($connection);
   </style>
 </head>
 <body>
+  <a href=".."></a>
 <?php include_once("../Internees' task/header.php"); ?>
 
 <div class="main-content">
