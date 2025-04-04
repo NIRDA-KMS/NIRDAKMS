@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <div class="nested-dropdown">
-                            <a href="#" class="nested-dropbtn"><i class="fas fa-comments"></i> Dissdddcussion Forum</a>
+                            <a href="#" class="nested-dropbtn"><i class="fas fa-comments"></i> Discussion Forum</a>
                             <div class="nested-dropdown-content">
                                 <a href="../DiscussionForum/Create_Forum.php" onclick="showContent('createForum')"><i class="fas fa-plus-circle"></i> Create Forum</a>
                                 <a href="../DiscussionForum/Manage_Forums.php" onclick="showContent('manageForums')"><i class="fas fa-cogs"></i> Manage Forums</a>
