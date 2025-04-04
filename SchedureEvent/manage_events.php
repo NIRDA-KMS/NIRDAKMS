@@ -100,6 +100,7 @@ function getEventStatus($start, $end, $isActive = 1) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
+  
   <style>
     /* Color Variables */
     :root {
@@ -473,7 +474,7 @@ function getEventStatus($start, $end, $isActive = 1) {
   </style>
 </head>
 <body>
-<?php include_once("../Internees' task/header.php"); ?>
+<?php include("../Internees_task/header.php"); ?>
 
 
 <div class="main-content">
@@ -483,7 +484,7 @@ function getEventStatus($start, $end, $isActive = 1) {
         <div class="view-switcher">
             <button id="tableViewBtn" class="view-btn active"><i class="fas fa-table"></i> List View</button>
             <button id="calendarViewBtn" class="view-btn"><i class="fas fa-calendar"></i> Calendar View</button>
-            <button id="addEventBtn" class="view-btn" style="float: right;"><i class="fas fa-plus"></i> Add Event</button>
+            <button id="addEventBtn" class="view-btn" style="float: right;"> <i class="fas fa-plus"></i><a href="./schedule_event.php" style="text-decoration: none;">Add Event</a> </button>
         </div>
         
         <!-- Table View -->
@@ -587,50 +588,7 @@ function getEventStatus($start, $end, $isActive = 1) {
     </div>
 </div>
 
-<!-- Add/Edit Event Modal -->
-<div id="editEventModal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal">&times;</span>
-        <h2 id="editModalTitle">Add New Event</h2>
-        <form id="eventForm">
-            <input type="hidden" id="eventId" name="eventId" value="">
-            <div class="form-group">
-                <label for="eventTitle">Event Title</label>
-                <input type="text" id="eventTitle" name="eventTitle" required class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="eventDescription">Description</label>
-                <textarea id="eventDescription" name="eventDescription" class="form-control" rows="3"></textarea>
-            </div>
-            <div class="form-group">
-                <label for="eventLocation">Location</label>
-                <input type="text" id="eventLocation" name="eventLocation" class="form-control">
-            </div>
-            <div class="form-row">
-                <div class="form-group col-md-6">
-                    <label for="startDateTime">Start Date & Time</label>
-                    <input type="datetime-local" id="startDateTime" name="startDateTime" required class="form-control">
-                </div>
-                <div class="form-group col-md-6">
-                    <label for="endingDateTime">End Date & Time</label>
-                    <input type="datetime-local" id="endingDateTime" name="endingDateTime" required class="form-control">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="maxAttendees">Maximum Attendees (0 for unlimited)</label>
-                <input type="number" id="maxAttendees" name="maxAttendees" min="0" class="form-control" value="0">
-            </div>
-            <div class="form-group">
-                <label for="isActive">Status</label>
-                <select id="isActive" name="isActive" class="form-control">
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary">Save Event</button>
-        </form>
-    </div>
-</div>
+
 
 <!-- JavaScript Libraries -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -760,6 +718,49 @@ $(document).ready(function() {
             return { text: 'Completed', class: 'status-completed' };
         }
     }
+});
+
+
+
+
+
+
+
+
+
+ // Sidebar Toggle Functionality
+ document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarCollapse');
+    
+    // Initialize from localStorage
+    if(localStorage.getItem('sidebarState') === 'open') {
+        sidebar.classList.add('active');
+        document.body.classList.add('sidebar-open');
+        document.querySelector('.main-content')?.classList.add('sidebar-active');
+    }
+    
+    // Toggle sidebar
+    if(toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isOpening = !sidebar.classList.contains('active');
+            
+            sidebar.classList.toggle('active');
+            document.body.classList.toggle('sidebar-open');
+            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
+            
+            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
+        });
+    }
+    
+    // Highlight current page in sidebar
+    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
+    document.querySelectorAll('.sidebar a').forEach(link => {
+        if(link.getAttribute('href').includes(currentPage)) {
+            link.classList.add('active');
+        }
+    });
 });
 </script>
 </body>

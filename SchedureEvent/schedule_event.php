@@ -392,7 +392,7 @@ mysqli_close($connection);
 </head>
 <body>
   <a href=".."></a>
-<?php include_once("../Internees' task/header.php"); ?>
+<?php include_once("../Internees_task/header.php"); ?>
 
 <div class="main-content">
   <div class="event-form-container">
@@ -421,10 +421,10 @@ mysqli_close($connection);
       <!-- Event Title -->
       <div class="form-group">
         <label for="eventTitle">
-          <i class="fas fa-heading"></i> Event Title <span class="required">*</span>
+          <i class="fas fa-heading"></i> Event Title <span >*</span>
         </label>
         <input type="text" id="eventTitle" name="eventTitle" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventTitle'])) ? 'is-invalid' : ''; ?>" 
-               value="<?php echo isset($_POST['eventTitle']) ? htmlspecialchars($_POST['eventTitle']) : ''; ?>" required>
+               value="<?php echo isset($_POST['eventTitle']) ? htmlspecialchars($_POST['eventTitle']) : ''; ?>">
         <div class="invalid-feedback">Please provide an event title</div>
       </div>
       
@@ -432,19 +432,19 @@ mysqli_close($connection);
       <div class="form-row">
         <div class="form-group">
           <label for="startDateTime">
-            <i class="fas fa-calendar"></i> Start Date & Time <span class="required">*</span>
+            <i class="fas fa-calendar"></i> Start Date & Time <span >*</span>
           </label>
           <input type="datetime-local" id="startDateTime" name="startDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['startDateTime'])) ? 'is-invalid' : ''; ?>" 
-                 value="<?php echo isset($_POST['startDateTime']) ? htmlspecialchars($_POST['startDateTime']) : ''; ?>" required>
+                 value="<?php echo isset($_POST['startDateTime']) ? htmlspecialchars($_POST['startDateTime']) : ''; ?>" >
           <div class="invalid-feedback">Please select a start time</div>
         </div>
         
         <div class="form-group">
           <label for="endDateTime">
-            <i class="fas fa-clock"></i> End Date & Time <span class="required">*</span>
+            <i class="fas fa-clock"></i> End Date & Time <span >*</span>
           </label>
           <input type="datetime-local" id="endDateTime" name="endDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['endDateTime'])) ? 'is-invalid' : ''; ?>" 
-                 value="<?php echo isset($_POST['endDateTime']) ? htmlspecialchars($_POST['endDateTime']) : ''; ?>" required>
+                 value="<?php echo isset($_POST['endDateTime']) ? htmlspecialchars($_POST['endDateTime']) : ''; ?>" >
           <div class="invalid-feedback">
             <?php 
               if (!empty($_POST) && !empty($_POST['startDateTime']) && !empty($_POST['endDateTime']) && 
@@ -461,21 +461,21 @@ mysqli_close($connection);
       <!-- Location -->
       <div class="form-group">
         <label for="eventLocation">
-          <i class="fas fa-location-dot"></i> Location <span class="required">*</span>
+          <i class="fas fa-location-dot"></i> Location <span >*</span>
         </label>
         <input type="text" id="eventLocation" name="eventLocation" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventLocation'])) ? 'is-invalid' : ''; ?>" 
                value="<?php echo isset($_POST['eventLocation']) ? htmlspecialchars($_POST['eventLocation']) : ''; ?>" 
-               placeholder="Physical address or meeting URL" required>
+               placeholder="Physical address or meeting URL" >
         <div class="invalid-feedback">Please provide a location</div>
       </div>
       
       <!-- Description -->
       <div class="form-group">
         <label for="eventDescription">
-          <i class="fas fa-align-left"></i> Description <span class="required">*</span>
+          <i class="fas fa-align-left"></i> Description <span >*</span>
         </label>
         <textarea id="eventDescription" name="eventDescription" rows="5" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventDescription'])) ? 'is-invalid' : ''; ?>" 
-                  placeholder="Enter event details..." required><?php 
+                  placeholder="Enter event details..."><?php 
                   echo isset($_POST['eventDescription']) ? htmlspecialchars($_POST['eventDescription']) : ''; 
                   ?></textarea>
         <div class="invalid-feedback">Please provide a description</div>
@@ -802,6 +802,53 @@ $(document).ready(function() {
 
 // Sidebar Toggle Functionality
 document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarCollapse');
+    
+    // Initialize from localStorage
+    if(localStorage.getItem('sidebarState') === 'open') {
+        sidebar.classList.add('active');
+        document.body.classList.add('sidebar-open');
+        document.querySelector('.main-content')?.classList.add('sidebar-active');
+    }
+    
+    // Toggle sidebar
+    if(toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isOpening = !sidebar.classList.contains('active');
+            
+            sidebar.classList.toggle('active');
+            document.body.classList.toggle('sidebar-open');
+            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
+            
+            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
+        });
+    }
+    
+    // Highlight current page in sidebar
+    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
+    document.querySelectorAll('.sidebar a').forEach(link => {
+        if(link.getAttribute('href').includes(currentPage)) {
+            link.classList.add('active');
+        }
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+ // Sidebar Toggle Functionality
+ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarCollapse');
     
