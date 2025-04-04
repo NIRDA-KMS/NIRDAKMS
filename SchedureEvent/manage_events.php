@@ -523,9 +523,10 @@ function getEventStatus($start, $end, $isActive = 1) {
                                         <a href="../SchedureEvent/edit.php" class="edit-event" data-event-id="<?php echo $event['event_id']; ?>">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
-                                        <a href="#" class="delete-event" data-event-id="<?php echo $event['event_id']; ?>">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </a>
+                                        <a href="delete.php?event_id=<?php echo $event['event_id']; ?>" class="delete-event" data-event-id="<?php echo $event['event_id']; ?>">
+    <i class="fas fa-trash"></i> Delete
+</a>
+
                                         <a href="#" class="toggle-active" data-event-id="<?php echo $event['event_id']; ?>" data-current-state="<?php echo ($event['isActive'] ?? 1) ? 'active' : 'inactive'; ?>">
                                             <i class="fas fa-eye<?php echo ($event['isActive'] ?? 1) ? '-slash' : ''; ?>"></i> 
                                             <?php echo ($event['isActive'] ?? 1) ? 'Deactivate' : 'Activate'; ?>
@@ -728,40 +729,7 @@ $(document).ready(function() {
 
 
 
- // Sidebar Toggle Functionality
- document.addEventListener('DOMContentLoaded', function() {
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarCollapse');
-    
-    // Initialize from localStorage
-    if(localStorage.getItem('sidebarState') === 'open') {
-        sidebar.classList.add('active');
-        document.body.classList.add('sidebar-open');
-        document.querySelector('.main-content')?.classList.add('sidebar-active');
-    }
-    
-    // Toggle sidebar
-    if(toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const isOpening = !sidebar.classList.contains('active');
-            
-            sidebar.classList.toggle('active');
-            document.body.classList.toggle('sidebar-open');
-            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
-            
-            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
-        });
-    }
-    
-    // Highlight current page in sidebar
-    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        if(link.getAttribute('href').includes(currentPage)) {
-            link.classList.add('active');
-        }
-    });
-});
+
 </script>
 </body>
 </html>

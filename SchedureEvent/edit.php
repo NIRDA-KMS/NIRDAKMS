@@ -195,6 +195,22 @@ function getEventStatus($start, $end, $isActive = 1) {
     .btn-cancel {
       background-color: #F44336;
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   </style>
 </head>
 <body>
@@ -280,16 +296,18 @@ function getEventStatus($start, $end, $isActive = 1) {
             </span>
           </td>
           
-          <!-- Actions -->
-          <td>
-            <?php if (isset($_GET['edit']) && $_GET['edit'] == $event['event_id']): ?>
-              <!-- Save/Cancel buttons are already in the forms -->
-            <?php else: ?>
-              <a href="?page=<?= $page ?>&edit=<?= $event['event_id'] ?>" class="action-btn">
+<!-- Actions -->
+<td>
+    <?php if (isset($_GET['edit']) && $_GET['edit'] == $event['event_id']): ?>
+        <!-- Save/Cancel buttons are already in the forms -->
+    <?php else: ?>
+        <div class="action-buttons">
+            <a href="?page=<?= $page ?>&edit=<?= $event['event_id'] ?>" class="action-btn">
                 <i class="fas fa-edit"></i> Edit
-              </a>
-            <?php endif; ?>
-          </td>
+            </a>
+        </div>
+    <?php endif; ?>
+</td>
         </tr>
       <?php endforeach; ?>
     </tbody>
