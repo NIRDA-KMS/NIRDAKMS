@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </style>
 </head>
 <body>
+    <?php include('../Internees_task/header.php') ?>
     <div class="container">
         <h1>Create New Forum Category</h1>
         

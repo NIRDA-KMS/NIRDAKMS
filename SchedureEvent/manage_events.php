@@ -527,7 +527,7 @@ function getEventStatus($start, $end, $isActive = 1) {
     <i class="fas fa-trash"></i> Delete
 </a>
 
-                                        <a href="#" class="toggle-active" data-event-id="<?php echo $event['event_id']; ?>" data-current-state="<?php echo ($event['isActive'] ?? 1) ? 'active' : 'inactive'; ?>">
+                                        <a href="../SchedureEvent/deactivate.ph" class="toggle-active" data-event-id="<?php echo $event['event_id']; ?>" data-current-state="<?php echo ($event['isActive'] ?? 1) ? 'active' : 'inactive'; ?>">
                                             <i class="fas fa-eye<?php echo ($event['isActive'] ?? 1) ? '-slash' : ''; ?>"></i> 
                                             <?php echo ($event['isActive'] ?? 1) ? 'Deactivate' : 'Activate'; ?>
                                         </a>
@@ -725,7 +725,65 @@ $(document).ready(function() {
 
 
 
-
+// Toggle event active/inactive status
+$(document).on('click', '.toggle-active', function(e) {
+    e.preventDefault();
+    
+    const eventId = $(this).data('event-id');
+    const currentState = $(this).data('current-state');
+    
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `You are about to ${currentState === 'active' ? 'deactivate' : 'activate'} this event`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, proceed'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: 'deactivate.php',
+                type: 'POST',
+                data: {
+                    event_id: eventId,
+                    current_state: currentState
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire(
+                            'Success!',
+                            `Event has been ${response.new_state === 'active' ? 'activated' : 'deactivated'}.`,
+                            'success'
+                        ).then(() => {
+                            // Update the button text and data attributes
+                            const button = $(`[data-event-id="${eventId}"].toggle-active`);
+                            button.data('current-state', response.new_state);
+                            button.html(`<i class="fas ${response.icon_class}"></i> ${response.action_text}`);
+                            
+                            // Reload the page to reflect changes
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire(
+                            'Error!',
+                            response.message || 'Failed to update event status',
+                            'error'
+                        );
+                    }
+                },
+                error: function() {
+                    Swal.fire(
+                        'Error!',
+                        'An error occurred while processing your request',
+                        'error'
+                    );
+                }
+            });
+        }
+    });
+});
 
 
 

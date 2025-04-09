@@ -274,73 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    $(document).ready(function() {
-        var sidebar = $('#sidebar');
-        var mainNav = $('nav:not(.navbar)');
-        var mainContent = $('.main-content');
-        var noticeBar = $('.notice-bar');
-        var closeNotice = $('.close-notice');
-
-        $('#sidebarCollapse').on('click', function() {
-            sidebar.toggleClass('active');
-            mainNav.toggleClass('sidebar-active');
-            mainContent.toggleClass('sidebar-active');
-        });
-
-        function updateNavPosition() {
-            if (noticeBar.hasClass('active')) {
-                mainNav.addClass('notice-active');
-            } else {
-                mainNav.removeClass('notice-active');
-            }
-        }
-
-        if (noticeBar.length && noticeBar.find('.notice-content').text().trim() !== '') {
-            noticeBar.addClass('active');
-            updateNavPosition();
-        }
-
-        closeNotice.on('click', function() {
-            noticeBar.removeClass('active');
-            updateNavPosition();
-        });
-    });
-
-
-    // Sidebar Toggle Functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarCollapse');
-    
-    // Initialize from localStorage
-    if(localStorage.getItem('sidebarState') === 'open') {
-        sidebar.classList.add('active');
-        document.body.classList.add('sidebar-open');
-        document.querySelector('.main-content')?.classList.add('sidebar-active');
-    }
-    
-    // Toggle sidebar
-    if(toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const isOpening = !sidebar.classList.contains('active');
-            
-            sidebar.classList.toggle('active');
-            document.body.classList.toggle('sidebar-open');
-            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
-            
-            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
-        });
-    }
-    
-    // Highlight current page in sidebar
-    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        if(link.getAttribute('href').includes(currentPage)) {
-            link.classList.add('active');
-        }
-    });
-});
+ 
 </script>
 
 </body>

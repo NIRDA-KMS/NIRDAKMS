@@ -688,13 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 $(document).ready(function() {
-    // Sidebar and navigation initialization
-    $('#sidebarCollapse').on('click', function(e) {
-        e.preventDefault();
-        $('#sidebar').toggleClass('active');
-        $('nav:not(.navbar)').toggleClass('sidebar-active');
-        $('.main-content').toggleClass('sidebar-active');
-    });
+   
     
     // Highlight current menu item
     $('.main-nav a[href="schedule_event.php"]').addClass('active');
