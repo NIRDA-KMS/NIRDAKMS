@@ -494,7 +494,7 @@
             
             <main class="main-content">
                 <div class="topic-list-header">
-                    <h2 style="padding-left: 200px;">Manage Forums</h2>
+                    <h2 style="padding-left: 200px;">Recent Topics</h2>
                     <button class="btn btn-primary" id="createTopicBtn">Create New Topic</button>
                 </div>
                 
