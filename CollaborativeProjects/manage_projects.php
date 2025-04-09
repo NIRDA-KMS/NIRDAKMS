@@ -39,6 +39,7 @@
             margin: 0 auto;
             padding: 20px;
             padding-top: 100px;
+            margin-right: 100px;
         }
         
         /* Header */

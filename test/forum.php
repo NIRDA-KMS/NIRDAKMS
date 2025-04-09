@@ -3,752 +3,1096 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create New Project</title>
-    <!-- TinyMCE for rich text editor -->
-    <script src="https://cdn.tiny.cloud/1/yy21cxb9sz8dz5s1jswqcenpziyj0y4frg79dtifqqamfxbf/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+    <title>Forum Management System</title>
+    <script src="https://cdn.tiny.cloud/1/yy21cxb9sz8dz5s1jswqcenpziyj0y4frg79dtifqqamfxbf/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>
     <style>
-    /* Updated to match header.css variables */
-    :root {
-        --primary-color: #1a237e;
-        --secondary-color: #2c3e50;
-        --accent-color: #00A0DF;
-        --background-color: #ecf0f1;
-        --text-color: #34495e;
-    }
+           /* Reset and Base Styles */
+           * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-        font-family: 'Roboto', sans-serif;
-        line-height: 1.6;
-        background-color: #f0f2f5;
-        color: #333;
-        padding-top: 110px; /* Adjusted for fixed header (50px) + nav (60px) */
-    }
-
-    .container {
-        max-width: 1000px;
-        margin-top: 150px;
-        background: white;
-        margin-left: 255px;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-        margin-bottom: 100px; /* Space for footer */
-    }
-
-    /* Wizard Header - Matched to nav styling */
-    .wizard-header {
-        display: flex;
-        background: #1a237e;
-        padding: 0;
-    }
-
-    .wizard-step {
-        flex: 1;
-        text-align: center;
-        padding: 15px;
-        position: relative;
-        color: rgba(255, 255, 255, 0.8);
-        font-weight: 400;
-        transition: all 0.3s ease;
-    }
-
-    .wizard-step.active {
-        color: white;
-        font-weight: 500;
-        background-color: rgba(0, 160, 223, 0.2);
-    }
-
-    .wizard-step.completed {
-        color: #2ecc71;
-    }
-
-    .wizard-step::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        width: 0;
-        height: 3px;
-        background: var(--accent-color);
-        transition: width 0.3s ease;
-    }
-
-    .wizard-step.active::after {
-        width: 100%;
-        left: 0;
-    }
-
-    /* Wizard Content */
-    .wizard-content {
-        padding: 30px;
-    }
-
-    .step-panel {
-        display: none;
-    }
-
-    .step-panel.active {
-        display: block;
-        animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    /* Form Styles - Matched to header theme */
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: var(--secondary-color);
-    }
-
-    .form-control {
-        width: 100%;
-        padding: 10px 15px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 16px;
-        transition: border-color 0.3s;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .form-control:focus {
-        border-color: var(--accent-color);
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(0, 160, 223, 0.2);
-    }
-
-    textarea.form-control {
-        min-height: 120px;
-        resize: vertical;
-    }
-
-    /* Buttons - Matched to header button styles */
-    .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.3s;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .btn-primary {
-        background: var(--accent-color);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #0088cc;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-secondary {
-        background: var(--background-color);
-        color: var(--secondary-color);
-    }
-
-    .btn-secondary:hover {
-        background: #d5dbdb;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-outline {
-        background: transparent;
-        border: 1px solid var(--accent-color);
-        color: var(--accent-color);
-    }
-
-    .btn-outline:hover {
-        background: rgba(0, 160, 223, 0.1);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    /* Member Selection - Updated colors */
-    .member-selection {
-        display: flex;
-        gap: 20px;
-        margin-top: 20px;
-    }
-
-    .available-members, .selected-members {
-        flex: 1;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px;
-        background: #f9f9f9;
-        min-height: 300px;
-    }
-
-    .member-item:hover {
-        background: rgba(0, 160, 223, 0.1);
-    }
-
-    /* Goals Section */
-    .goal-item:hover {
-        border-color: var(--accent-color);
-    }
-
-    /* Templates */
-    .template-card:hover {
-        border-color: var(--accent-color);
-    }
-
-    .template-card.selected {
-        border: 2px solid var(--accent-color);
-        background: rgba(0, 160, 223, 0.1);
-    }
-
-    /* Review Section */
-    .review-section {
-        margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .review-section h3 {
-        color: var(--primary-color);
-        margin-bottom: 15px;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .review-item {
-        margin-bottom: 10px;
-    }
-
-    .review-text {
-        background: #f9f9f9;
-        padding: 10px;
-        border-radius: 4px;
-        border-left: 3px solid var(--accent-color);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
         body {
-            padding-top: 135px; /* Adjusted for mobile header height */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            
+            width: 100%;
+            padding-top: 60px; /* Adjust based on your header's fixed height */
+            
         }
-        
-        .container {
-           margin-top: 200px;
-            padding-top: 100px;
-            border-radius: 0;
+
+        /*Layout Styles */
+         .main-container {
+            
+            margin: 80px auto 20px auto;   /*Adjust top margin to be greater than padding-top  */
+            /* padding: 0 15px; */
+            /* padding-left: 25px; */
+            margin-left: 255px;
+            margin-right: 100px;
+            padding-right: 100px;
+            margin-bottom: 100px;
+        }   
+
+        .forum-layout {
+            display: inline-block;
+            width: 1000px;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            bottom: -20 px;
         }
-        
-        .wizard-content {
+
+        /* Sidebar Styles */
+        .sidebar {
+            background-color: #fff;
+            border-radius: 5px;
             padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
-        
-        .member-selection {
-            flex-direction: column;
+
+        .category-list h3 {
+            padding: 8px;
+            background: #2c3e50;
+            color: #fff;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 16px;
         }
-        
-        .date-picker-group {
-            flex-direction: column;
-            gap: 10px;
+
+        .category-list ul {
+            list-style: none;
         }
-        
-        .wizard-step {
+
+        .category-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .category-list a {
+            color: #3498db;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .category-list a:hover {
+            color: #1a6ea0;
+        }
+
+        .forum-stats {
+            margin-top: 20px;
+        }
+
+        .forum-stats h3 {
+            padding: 8px;
+            background: #2c3e50;
+            color: #fff;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .forum-stats p {
+            margin-bottom: 5px;
             font-size: 14px;
-            padding: 10px 5px;
         }
-        
+
+        /* Main Content Styles */
+        .main-content {
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 90px;
+             
+            
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .topic-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .topic-list-header h2 {
+            font-size: 20px;
+            color: #2c3e50;
+        }
+
+        /* Button Styles */
         .btn {
             padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s;
         }
-    }
 
-    @media (max-width: 480px) {
-        body {
-            padding-top: 160px; /* Extra space for mobile navigation */
+        .btn-primary {
+            background-color: #3498db;
+            color: #fff;
         }
-    }
-</style>
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .create-topic-btn,
+        .review-report-btn {
+            /* You might need to adjust this if your header has specific button styles */
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            background-color: #3498db;
+            color: #fff;
+        }
+
+        .review-report-btn {
+            margin-top: 20px;
+        }
+
+        /* Topic Item Styles */
+        .topic-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            transition: background-color 0.3s;
+        }
+
+        .topic-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .topic-title {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .topic-meta {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .topic-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+
+        .pinned-badge {
+            background-color: #2ecc71;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+            display: inline-block;
+        }
+
+        .mod-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .mod-btn {
+            background: none;
+            border: none;
+            color: #7f8c8d;
+            cursor: pointer;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .mod-btn:hover {
+            color: #3498db;
+        }
+
+        /* Status Toggle Styles */
+        .status-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: #fff;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2ecc71;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000; /* Ensure it's below the header's z-index if the header is fixed and has a higher z-index */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input[type="text"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Reply Styles */
+        .reply {
+            margin-left: 30px;
+            padding: 10px;
+            border-left: 2px solid #eee;
+            margin-bottom: 15px;
+        }
+
+        .reply-content {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .reply-meta {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .flag-btn {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+            transition: color 0.3s;
+        }
+
+        .flag-btn:hover {
+            color: #c0392b;
+        }
+
+        .flag-form {
+            display: none;
+            padding: 10px;
+            background: #fff5f5;
+            margin-top: 5px;
+            border-radius: 4px;
+        }
+
+        /* State Styles */
+        .flagged {
+            border-left: 3px solid #e74c3c;
+            background-color: #fff5f5;
+        }
+
+        .deactivated {
+            opacity: 0.6;
+            background-color: #f9f9f9;
+            border-left: 3px solid #95a5a6;
+        }
+
+        /* Admin Panel Styles */
+        .admin-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .admin-tab {
+            padding: 8px 15px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: #7f8c8d;
+            transition: all 0.3s;
+        }
+
+        .admin-tab.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+
+        .admin-tab-content {
+            display: none;
+        }
+
+        .admin-tab-content.active {
+            display: block;
+        }
+
+        .flagged-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #e74c3c;
+            background-color: #fff5f5;
+            border-radius: 4px;
+        }
+
+        .flagged-item p {
+            margin-bottom: 8px;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .forum-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .mod-controls {
+                position: static;
+                margin-top: 10px;
+                justify-content: flex-end;
+            }
+
+            .reply {
+                margin-left: 15px;
+            }
+
+            .admin-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
-<?php include("../Internees_task/header.php"); ?>
-    <div class="container">
-        <!-- Wizard Header -->
-        <div class="wizard-header">
-            <div class="wizard-step active" data-step="1">
-                <span>1. Basic Info</span>
-            </div>
-            <div class="wizard-step" data-step="2">
-                <span>2. Team Setup</span>
-            </div>
-            <div class="wizard-step" data-step="3">
-                <span>3. Goals</span>
-            </div>
-            <div class="wizard-step" data-step="4">
-                <span>4. Review</span>
-            </div>
+<?php include('../Internees_task/header.php') ?>
+    
+    <div class="main-container">
+        <div class="forum-layout">
+            <aside class="sidebar">
+                <div class="category-list">
+                    <h3>Categories</h3>
+                    <ul>
+                        <li><a href="#">General Discussion</a></li>
+                        <li><a href="#">Technical Support</a></li>
+                        <li><a href="#">Feature Requests</a></li>
+                        <li><a href="#">Announcements</a></li>
+                    </ul>
+                </div>
+                
+                <div class="forum-stats">
+                    <h3>Forum Statistics</h3>
+                    <p>Topics: 124</p>
+                    <p>Posts: 892</p>
+                    <p>Members: 342</p>
+                </div>
+            </aside>
+            
+            <main class="main-content">
+                <div class="topic-list-header">
+                    <h2 style="padding-left: 200px;">Manage Forums</h2>
+                    <button class="btn btn-primary" id="createTopicBtn">Create New Topic</button>
+                </div>
+                
+                <div class="topic-list" id="topicList">
+                    <!-- Topics will be loaded here -->
+                </div>
+
+                <button class="btn btn-primary review-report-btn" id="reviewReports">
+                    Review Reports
+                </button>
+            </main>
         </div>
-        
-        <!-- Wizard Content -->
-        <div class="wizard-content">
-            <!-- Step 1: Basic Info -->
-            <div class="step-panel active" id="step1">
-                <h2>Project Information</h2>
-                <p class="subtitle">Enter basic details about your project</p>
-                
+    </div>
+    
+    <!-- Create Topic Modal -->
+    <div class="modal" id="createTopicModal">
+        <div class="modal-content">
+            <h2>Create New Topic</h2>
+            <form id="topicForm">
                 <div class="form-group">
-                    <label for="projectName">Project Name</label>
-                    <input type="text" id="projectName" class="form-control" placeholder="e.g. Website Redesign Project">
-                </div>
-                
-                <div class="form-group">
-                    <label for="projectDescription">Description</label>
-                    <textarea id="projectDescription" class="form-control" placeholder="Describe your project in detail..."></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label>Project Timeline</label>
-                    <div class="date-picker-group">
-                        <div class="date-picker">
-                            <label for="startDate">Start Date</label>
-                            <input type="date" id="startDate" class="form-control">
-                        </div>
-                        <div class="date-picker">
-                            <label for="endDate">End Date</label>
-                            <input type="date" id="endDate" class="form-control">
-                        </div>
-                    </div>
+                    <label for="topicCategory">Category</label>
+                    <select id="topicCategory" required>
+                        <option value="">Select a category</option>
+                        <option value="1">General Discussion</option>
+                        <option value="2">Technical Support</option>
+                        <option value="3">Feature Requests</option>
+                        <option value="4">Announcements</option>
+                    </select>
                 </div>
                 
                 <div class="form-group">
-                    <label>Project Template (Optional)</label>
-                    <div class="template-options">
-                        <div class="template-card" data-template="web-dev">
-                            <h4>Web Development</h4>
-                            <p>Standard phases for website projects</p>
-                        </div>
-                        <div class="template-card" data-template="marketing">
-                            <h4>Marketing Campaign</h4>
-                            <p>Template for marketing initiatives</p>
-                        </div>
-                        <div class="template-card" data-template="product">
-                            <h4>Product Launch</h4>
-                            <p>Product development workflow</p>
-                        </div>
-                        <div class="template-card" data-template="research">
-                            <h4>Research Project</h4>
-                            <p>Academic research framework</p>
-                        </div>
-                    </div>
+                    <label for="topicTitle">Title</label>
+                    <input type="text" id="topicTitle" required>
                 </div>
                 
-                <div class="wizard-actions">
-                    <div></div> <!-- Empty div for spacing -->
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Team Setup</button>
+                <div class="form-group">
+                    <label for="topicContent">Content</label>
+                    <textarea id="topicContent" style="height: 300px;"></textarea>
                 </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelTopic">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Topic</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Topic View Modal -->
+    <div class="modal" id="topicViewModal">
+        <div class="modal-content">
+            <div class="topic-header">
+                <h2 id="viewTopicTitle"></h2>
+                <div class="topic-meta" id="viewTopicMeta"></div>
             </div>
             
-            <!-- Step 2: Team Setup -->
-            <div class="step-panel" id="step2">
-                <h2>Team Members</h2>
-                <p class="subtitle">Add collaborators and assign roles</p>
-                
-                <div class="member-selection">
-                    <div class="available-members">
-                        <h3>Available Members</h3>
-                        <ul class="member-list" id="availableMembers">
-                            <li class="member-item" draggable="true" data-id="1">
-                                <span>John Smith</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="2">
-                                <span>Sarah Johnson</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="3">
-                                <span>Michael Brown</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="4">
-                                <span>Emily Davis</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="5">
-                                <span>David Wilson</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div class="selected-members">
-                        <h3>Project Team</h3>
-                        <div class="role-tabs">
-                            <button class="role-tab active" data-role="manager">Managers</button>
-                            <button class="role-tab" data-role="contributor">Contributors</button>
-                            <button class="role-tab" data-role="viewer">Viewers</button>
-                        </div>
-                        <ul class="member-list" id="projectTeam">
-                            <!-- Members will be added here via drag and drop -->
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Goals</button>
-                </div>
+            <div class="topic-content" id="viewTopicContent" style="margin: 20px 0;"></div>
+            
+            <div class="topic-replies" id="topicReplies">
+                <h3>Replies</h3>
+                <!-- Replies will be loaded here -->
             </div>
             
-            <!-- Step 3: Goals -->
-            <div class="step-panel" id="step3">
-                <h2>Project Goals</h2>
-                <p class="subtitle">Define your project objectives and milestones</p>
-                
-                <div id="goalsContainer">
-                    <div class="goal-item">
-                        <button class="remove-goal" onclick="removeGoal(this)">×</button>
-                        <div class="form-group">
-                            <label>Goal Title</label>
-                            <input type="text" class="form-control" placeholder="e.g. Complete homepage design">
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea class="form-control" placeholder="Describe this goal in detail..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Target Date</label>
-                            <input type="date" class="form-control">
-                        </div>
-                    </div>
-                </div>
-                
-                <button class="btn btn-outline" onclick="addGoal()">+ Add Another Goal</button>
-                
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Review</button>
-                </div>
-            </div>
-            
-            <!-- Step 4: Review -->
-            <div class="step-panel" id="step4">
-                <h2>Review Project</h2>
-                <p class="subtitle">Verify all details before creating your project</p>
-                
-                <div class="review-section">
-                    <h3>Project Information</h3>
-                    <div class="review-item">
-                        <strong>Project Name:</strong>
-                        <span id="reviewName">Not specified</span>
-                    </div>
-                    <div class="review-item">
-                        <strong>Description:</strong>
-                        <div id="reviewDescription" class="review-text">Not specified</div>
-                    </div>
-                    <div class="review-item">
-                        <strong>Timeline:</strong>
-                        <span id="reviewTimeline">Not specified</span>
-                    </div>
-                </div>
-                
-                <div class="review-section">
-                    <h3>Project Team</h3>
-                    <div id="reviewTeam">
-                        <p>No team members added yet</p>
-                    </div>
-                </div>
-                
-                <div class="review-section">
-                    <h3>Project Goals</h3>
-                    <div id="reviewGoals">
-                        <p>No goals defined yet</p>
-                    </div>
-                </div>
-                
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="submitProject()">Create Project</button>
-                </div>
+            <div class="reply-form" style="margin-top: 20px;">
+                <h3>Post a Reply</h3>
+                <textarea id="replyContent" style="width: 100%; height: 150px; margin-bottom: 10px;"></textarea>
+                <button class="btn btn-primary" id="submitReply">Post Reply</button>
             </div>
         </div>
     </div>
-
-    <script>
-        // Initialize TinyMCE for rich text editor
-        tinymce.init({
-            selector: '#projectDescription',
-            plugins: 'lists link',
-            toolbar: 'bold italic | bullist numlist | link',
-            menubar: false,
-            height: 200
-        });
-        
-        // Wizard Navigation
-        let currentStep = 1;
-        
-        function nextStep() {
-            if (validateCurrentStep()) {
-                document.getElementById(`step${currentStep}`).classList.remove('active');
-                document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.remove('active');
-                
-                currentStep++;
-                
-                document.getElementById(`step${currentStep}`).classList.add('active');
-                document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.add('active');
-                
-                if (currentStep === 4) {
-                    updateReviewSection();
-                }
-            }
-        }
-        
-        function prevStep() {
-            document.getElementById(`step${currentStep}`).classList.remove('active');
-            document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.remove('active');
+    
+    <!-- Admin Panel Modal -->
+    <div class="modal" id="reviewReportsModal">
+        <div class="modal-content">
+            <h2>Admin Review Reports</h2>
             
-            currentStep--;
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="flagged">Flagged Content</button>
+                <button class="admin-tab" data-tab="users">User Management</button>
+                <button class="admin-tab" data-tab="categories">Categories</button>
+            </div>
             
-            document.getElementById(`step${currentStep}`).classList.add('active');
-            document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.add('active');
-        }
-        
-        function validateCurrentStep() {
-            if (currentStep === 1) {
-                const projectName = document.getElementById('projectName').value.trim();
-                if (!projectName) {
-                    alert('Please enter a project name');
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        // Template Selection
-        document.querySelectorAll('.template-card').forEach(card => {
-            card.addEventListener('click', function() {
-                document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-                this.classList.add('selected');
-            });
-        });
-        
-        // Drag and Drop for Team Members
-        let draggedItem = null;
-        
-        document.querySelectorAll('.member-item').forEach(item => {
-            item.addEventListener('dragstart', function() {
-                draggedItem = this;
-                setTimeout(() => this.classList.add('dragging'), 0);
-            });
-            
-            item.addEventListener('dragend', function() {
-                this.classList.remove('dragging');
-            });
-        });
-        
-        document.querySelectorAll('.member-list').forEach(list => {
-            list.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                const afterElement = getDragAfterElement(this, e.clientY);
-                if (afterElement == null) {
-                    this.appendChild(draggedItem);
-                } else {
-                    this.insertBefore(draggedItem, afterElement);
-                }
-            });
-        });
-        
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.member-item:not(.dragging)')];
-            
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-        
-        // Role Assignment
-        document.querySelectorAll('.role-tab').forEach(tab => {
-            tab.addEventListener('click', function() {
-                document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-                
-                const role = this.dataset.role;
-                if (draggedItem) {
-                    const roleSpan = draggedItem.querySelector('.member-role');
-                    roleSpan.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-                    roleSpan.style.background = getRoleColor(role);
-                }
-            });
-        });
-        
-        function getRoleColor(role) {
-            const colors = {
-                manager: '#3498db',
-                contributor: '#2ecc71',
-                viewer: '#95a5a6'
-            };
-            return colors[role] || '#eee';
-        }
-        
-        // Goals Management
-        function addGoal() {
-            const goalsContainer = document.getElementById('goalsContainer');
-            const goalId = Date.now();
-            
-            const goalHtml = `
-                <div class="goal-item">
-                    <button class="remove-goal" onclick="removeGoal(this)">×</button>
-                    <div class="form-group">
-                        <label>Goal Title</label>
-                        <input type="text" class="form-control" placeholder="e.g. Complete homepage design">
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea class="form-control" placeholder="Describe this goal in detail..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Target Date</label>
-                        <input type="date" class="form-control">
-                    </div>
+            <div class="admin-tab-content active" id="flaggedContent" style="margin-top: 20px;">
+                <h3>Flagged Posts <span id="flag-count">(0)</span></h3>
+                <div class="flagged-posts-list" id="flaggedPostsList">
+                    <!-- Flagged posts will be loaded here -->
                 </div>
-            `;
+            </div>
             
-            goalsContainer.insertAdjacentHTML('beforeend', goalHtml);
-        }
-        
-        function removeGoal(button) {
-            if (document.querySelectorAll('.goal-item').length > 1) {
-                button.closest('.goal-item').remove();
-            } else {
-                alert('A project must have at least one goal');
-            }
-        }
-        
-        // Review Section Update
-        function updateReviewSection() {
-            // Project Info
-            document.getElementById('reviewName').textContent = 
-                document.getElementById('projectName').value || 'Not specified';
+            <div class="admin-tab-content" id="usersContent" style="margin-top: 20px;">
+                <h3>User Management</h3>
+                <p>User management content goes here</p>
+            </div>
             
-            document.getElementById('reviewDescription').innerHTML = 
-                tinymce.get('projectDescription').getContent() || 'Not specified';
+            <div class="admin-tab-content" id="categoriesContent" style="margin-top: 20px;">
+                <h3>Category Management</h3>
+                <p>Category management content goes here</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Document Ready Function
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize TinyMCE
+            initTinyMCE();
             
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            document.getElementById('reviewTimeline').textContent = 
-                startDate && endDate ? `${formatDate(startDate)} to ${formatDate(endDate)}` : 'Not specified';
-            
-            // Team Members
-            const teamMembers = document.getElementById('projectTeam').children;
-            if (teamMembers.length > 0) {
-                let teamHtml = '<ul>';
-                Array.from(teamMembers).forEach(member => {
-                    const name = member.querySelector('span:first-child').textContent;
-                    const role = member.querySelector('.member-role').textContent;
-                    teamHtml += `<li><strong>${name}</strong> (${role})</li>`;
-                });
-                teamHtml += '</ul>';
-                document.getElementById('reviewTeam').innerHTML = teamHtml;
-            }
-            
-            // Goals
-            const goals = document.querySelectorAll('.goal-item');
-            if (goals.length > 0) {
-                let goalsHtml = '<ul>';
-                goals.forEach(goal => {
-                    const title = goal.querySelector('input[type="text"]').value || 'Untitled goal';
-                    const description = goal.querySelector('textarea').value || 'No description';
-                    const date = goal.querySelector('input[type="date"]').value;
-                    
-                    goalsHtml += `
-                        <li>
-                            <strong>${title}</strong>
-                            <p>${description}</p>
-                            ${date ? `<small>Target: ${formatDate(date)}</small>` : ''}
-                        </li>
-                    `;
-                });
-                goalsHtml += '</ul>';
-                document.getElementById('reviewGoals').innerHTML = goalsHtml;
-            }
-        }
-        
-        function formatDate(dateString) {
-            if (!dateString) return '';
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(dateString).toLocaleDateString('en-US', options);
-        }
-        
-        // Form Submission
-        function submitProject() {
-            // Collect all form data
-            const projectData = {
-                name: document.getElementById('projectName').value,
-                description: tinymce.get('projectDescription').getContent(),
-                startDate: document.getElementById('startDate').value,
-                endDate: document.getElementById('endDate').value,
-                template: document.querySelector('.template-card.selected')?.dataset.template,
-                members: [],
-                goals: []
-            };
-            
-            // Get team members
-            const teamMembers = document.getElementById('projectTeam').children;
-            Array.from(teamMembers).forEach(member => {
-                projectData.members.push({
-                    id: member.dataset.id,
-                    name: member.querySelector('span:first-child').textContent,
-                    role: member.querySelector('.member-role').textContent.toLowerCase()
-                });
+            // Initialize the application
+            initApp();
+        });
+
+        /**
+         * Initialize TinyMCE editor
+         */
+        function initTinyMCE() {
+            tinymce.init({
+                selector: '#topicContent',
+                plugins: 'link lists code',
+                toolbar: 'bold italic | bullist numlist | link code',
+                menubar: false,
+                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
             });
+        }
+
+        /**
+         * Main application initialization
+         */
+        function initApp() {
+            // DOM Elements
+            const createTopicBtn = document.getElementById('createTopicBtn');
+            const createTopicModal = document.getElementById('createTopicModal');
+            const cancelTopicBtn = document.getElementById('cancelTopic');
+            const topicForm = document.getElementById('topicForm');
+            const topicList = document.getElementById('topicList');
+            const reviewReportsBtn = document.getElementById('reviewReports');
+            const reviewReportsModal = document.getElementById('reviewReportsModal');
+            const topicViewModal = document.getElementById('topicViewModal');
             
-            // Get goals
-            const goals = document.querySelectorAll('.goal-item');
-            goals.forEach(goal => {
-                projectData.goals.push({
-                    title: goal.querySelector('input[type="text"]').value,
-                    description: goal.querySelector('textarea').value,
-                    targetDate: goal.querySelector('input[type="date"]').value
-                });
-            });
-            
-            console.log('Project data to submit:', projectData);
-            
-            // In a real app, you would use AJAX to submit the data
-            /*
-            fetch('/api/projects', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            // Sample Data (in a real app, this would come from an API)
+            const topics = [
+                {
+                    id: 1,
+                    title: "How to use the new forum features?",
+                    category: "General Discussion",
+                    author: "admin",
+                    date: "2023-05-15",
+                    replies: 5,
+                    views: 124,
+                    pinned: true,
+                    active: true,
+                    content: "<p>Welcome to our new forum! Here's how to use the new features...</p>",
+                    repliesList: [
+                        {
+                            id: 101,
+                            author: "user1",
+                            date: "2023-05-16",
+                            content: "Thanks for the guide! Very helpful.",
+                            flagged: false
+                        },
+                        {
+                            id: 102,
+                            author: "user2",
+                            date: "2023-05-17",
+                            content: "I'm having trouble with the editor. Can you help?",
+                            flagged: true,
+                            flagReason: "Request for help"
+                        }
+                    ]
                 },
-                body: JSON.stringify(projectData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert('Project created successfully!');
-                window.location.href = `/projects/${data.id}`;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('There was an error creating the project');
-            });
-            */
+                {
+                    id: 2,
+                    title: "Bug report: Login issues",
+                    category: "Technical Support",
+                    author: "user3",
+                    date: "2023-05-14",
+                    replies: 3,
+                    views: 87,
+                    pinned: false,
+                    active: true,
+                    content: "<p>I'm experiencing issues when trying to log in...</p>",
+                    repliesList: [
+                        {
+                            id: 201,
+                            author: "admin",
+                            date: "2023-05-14",
+                            content: "We're looking into this issue. Thanks for reporting.",
+                            flagged: false
+                        }
+                    ]
+                }
+            ];
             
-            // For demo purposes, just show an alert
-            alert('Project creation functionality would submit to your backend API\nCheck console for collected data');
+            // Event Listeners
+            createTopicBtn.addEventListener('click', showCreateTopicModal);
+            cancelTopicBtn.addEventListener('click', hideCreateTopicModal);
+            reviewReportsBtn.addEventListener('click', showReviewReportsModal);
+            topicForm.addEventListener('submit', handleTopicFormSubmit);
+            
+            // Close modals when clicking outside
+            document.addEventListener('click', handleModalOutsideClick);
+            
+            // Admin tab switching
+            setupAdminTabs();
+            
+            // Initialize the page
+            loadTopics();
+            
+            /**
+             * Show create topic modal
+             */
+            function showCreateTopicModal() {
+                createTopicModal.style.display = 'flex';
+            }
+
+            /**
+             * Hide create topic modal
+             */
+            function hideCreateTopicModal() {
+                createTopicModal.style.display = 'none';
+            }
+
+            /**
+             * Show review reports modal
+             */
+            function showReviewReportsModal(e) {
+                e.preventDefault();
+                reviewReportsModal.style.display = 'flex';
+                loadFlaggedContent();
+            }
+
+            /**
+             * Handle topic form submission
+             */
+            function handleTopicFormSubmit(e) {
+                e.preventDefault();
+                createNewTopic();
+            }
+
+            /**
+             * Handle modal outside click
+             */
+            function handleModalOutsideClick(e) {
+                if (e.target.classList.contains('modal')) {
+                    e.target.style.display = 'none';
+                }
+            }
+
+            /**
+             * Setup admin tabs functionality
+             */
+            function setupAdminTabs() {
+                document.querySelectorAll('.admin-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        // Update tab styles
+                        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        // Update content visibility
+                        document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+                        document.getElementById(`${tab.dataset.tab}Content`).classList.add('active');
+                    });
+                });
+            }
+
+            /**
+             * Load topics into the topic list
+             */
+            function loadTopics() {
+                topicList.innerHTML = '';
+                
+                if (topics.length === 0) {
+                    topicList.innerHTML = '<p>No topics found.</p>';
+                    return;
+                }
+                
+                topics.forEach(topic => {
+                    const topicElement = document.createElement('div');
+                    topicElement.className = `topic-item ${topic.active ? '' : 'deactivated'}`;
+                    topicElement.innerHTML = `
+                        <h3 class="topic-title">${topic.title} 
+                            ${topic.pinned ? '<span class="pinned-badge">Pinned</span>' : ''}
+                            ${!topic.active ? '<span class="pinned-badge" style="background:#95a5a6">Hidden</span>' : ''}
+                        </h3>
+                        <div class="topic-meta">Posted by ${topic.author} in ${topic.category} on ${topic.date}</div>
+                        <div class="topic-stats">
+                            <span>${topic.replies} replies</span>
+                            <span>${topic.views} views</span>
+                        </div>
+                        <div class="mod-controls">
+                            <button class="mod-btn" onclick="viewTopic(${topic.id})">View</button>
+                            <button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
+                            <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>
+                            <button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
+                                ${topic.pinned ? 'Unpin' : 'Pin'}
+                            </button>
+                            <div class="status-toggle">
+                                <label class="switch">
+                                    <input type="checkbox" ${topic.active ? 'checked' : ''} onchange="toggleTopicStatus(${topic.id}, this.checked)">
+                                    <span class="slider"></span>
+                                </label>
+                                <span>${topic.active ? 'Active' : 'Hidden'}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    topicList.appendChild(topicElement);
+                });
+            }
+
+            /**
+             * View a specific topic
+             */
+            function viewTopic(topicId) {
+                const topic = topics.find(t => t.id === topicId);
+                if (!topic) {
+                    alert('Topic not found');
+                    return;
+                }
+                
+                document.getElementById('viewTopicTitle').textContent = topic.title;
+                document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
+                document.getElementById('viewTopicMeta').innerHTML = `
+                    Posted by ${topic.author} in ${topic.category} on ${topic.date}
+                `;
+                document.getElementById('viewTopicContent').innerHTML = topic.content;
+                
+                // Load replies
+                const repliesContainer = document.getElementById('topicReplies');
+                repliesContainer.innerHTML = '<h3>Replies</h3>';
+                
+                if (topic.repliesList.length === 0) {
+                    repliesContainer.innerHTML += '<p>No replies yet.</p>';
+                } else {
+                    topic.repliesList.forEach(reply => {
+                        const replyElement = document.createElement('div');
+                        replyElement.className = `reply ${reply.flagged ? 'flagged' : ''}`;
+                        replyElement.innerHTML = `
+                            <div class="reply-content">${reply.content}</div>
+                            <div class="reply-meta">
+                                Posted by ${reply.author} on ${reply.date}
+                                <button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>
+                            </div>
+                            <div class="flag-form" id="flag-form-${reply.id}">
+                                <select id="flag-reason-${reply.id}" style="margin-bottom:5px; width:100%">
+                                    <option value="spam">Spam</option>
+                                    <option value="inappropriate">Inappropriate Content</option>
+                                    <option value="offensive">Offensive Language</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <button class="btn btn-primary" onclick="submitFlag(${reply.id}, ${topicId})">Submit Report</button>
+                            </div>
+                            <div class="mod-controls">
+                                <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
+                                <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
+                            </div>
+                        `;
+                        repliesContainer.appendChild(replyElement);
+                    });
+                }
+                
+                // Set up reply submission
+                document.getElementById('submitReply').onclick = () => {
+                    const replyContent = document.getElementById('replyContent').value;
+                    if (replyContent.trim()) {
+                        // In a real app, this would be an API call
+                        topic.repliesList.push({
+                            id: Math.floor(Math.random() * 1000),
+                            author: "current_user",
+                            date: new Date().toISOString().split('T')[0],
+                            content: replyContent,
+                            flagged: false
+                        });
+                        
+                        document.getElementById('replyContent').value = '';
+                        viewTopic(topicId); // Refresh the view
+                    }
+                };
+                
+                topicViewModal.style.display = 'flex';
+            }
+
+            /**
+             * Create a new topic
+             */
+            function createNewTopic() {
+                const category = document.getElementById('topicCategory').value;
+                const title = document.getElementById('topicTitle').value;
+                const content = tinymce.get('topicContent').getContent();
+                
+                if (!category || !title || !content) {
+                    alert('Please fill in all fields');
+                    return;
+                }
+                
+                // In a real app, this would be an API call
+                const newTopic = {
+                    id: topics.length + 1,
+                    title,
+                    category: document.getElementById('topicCategory').options[document.getElementById('topicCategory').selectedIndex].text,
+                    author: "current_user",
+                    date: new Date().toISOString().split('T')[0],
+                    replies: 0,
+                    views: 0,
+                    pinned: false,
+                    active: true,
+                    content,
+                    repliesList: []
+                };
+                
+                topics.unshift(newTopic);
+                loadTopics();
+                
+                // Reset form
+                document.getElementById('topicCategory').value = '';
+                document.getElementById('topicTitle').value = '';
+                tinymce.get('topicContent').setContent('');
+                
+                createTopicModal.style.display = 'none';
+            }
+
+            /**
+             * Edit a topic
+             */
+            function editTopic(topicId) {
+                const topic = topics.find(t => t.id === topicId);
+                if (!topic) return;
+                
+                // In a real app, this would open an edit form
+                alert(`Edit functionality for topic ${topicId} would open an edit form`);
+            }
+
+            /**
+             * Edit a reply
+             */
+            function editReply(replyId, topicId) {
+                // In a real app, this would open an edit form
+                alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
+            }
+
+            /**
+             * Confirm deletion of a topic or reply
+             */
+            function confirmDelete(id, isTopic) {
+                if (confirm(`Are you sure you want to delete this ${isTopic ? 'topic' : 'reply'}?`)) {
+                    // In a real app, this would be an API call
+                    if (isTopic) {
+                        const index = topics.findIndex(t => t.id === id);
+                        if (index !== -1) {
+                            topics.splice(index, 1);
+                            loadTopics();
+                        }
+                    } else {
+                        // Find the reply in any topic and delete it
+                        for (const topic of topics) {
+                            const index = topic.repliesList.findIndex(r => r.id === id);
+                            if (index !== -1) {
+                                topic.repliesList.splice(index, 1);
+                                // Refresh if we're viewing this topic
+                                if (topicViewModal.style.display === 'flex') {
+                                    const currentTopicId = parseInt(document.getElementById('viewTopicTitle').dataset.topicId);
+                                    if (currentTopicId === topic.id) {
+                                        viewTopic(topic.id);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            /**
+             * Toggle pin status of a topic
+             */
+            function togglePin(topicId, currentlyPinned) {
+                const topic = topics.find(t => t.id === topicId);
+                if (topic) {
+                    topic.pinned = !currentlyPinned;
+                    loadTopics();
+                }
+            }
+
+            /**
+             * Toggle active status of a topic
+             */
+            function toggleTopicStatus(topicId, isActive) {
+                const topic = topics.find(t => t.id === topicId);
+                if (topic) {
+                    topic.active = isActive;
+                    loadTopics();
+                }
+            }
+
+            /**
+             * Show flag form for a reply
+             */
+            function showFlagForm(replyId) {
+                document.querySelectorAll('.flag-form').forEach(form => form.style.display = 'none');
+                document.getElementById(`flag-form-${replyId}`).style.display = 'block';
+            }
+
+            /**
+             * Submit a flag for a reply
+             */
+            function submitFlag(replyId, topicId) {
+                const reason = document.getElementById(`flag-reason-${replyId}`).value;
+                const topic = topics.find(t => t.id === topicId);
+                if (topic) {
+                    const reply = topic.repliesList.find(r => r.id === replyId);
+                    if (reply) {
+                        reply.flagged = true;
+                        reply.flagReason = reason;
+                        alert('Thank you for reporting. Moderators will review this content.');
+                        // Refresh flagged content list if admin panel is open
+                        if (reviewReportsModal.style.display === 'flex') {
+                            loadFlaggedContent();
+                        }
+                    }
+                }
+            }
+
+            /**
+             * Load flagged content for admin review
+             */
+            function loadFlaggedContent() {
+                let flaggedCount = 0;
+                const flaggedPostsList = document.getElementById('flaggedPostsList');
+                flaggedPostsList.innerHTML = '';
+                
+                topics.forEach(topic => {
+                    topic.repliesList.forEach(reply => {
+                        if (reply.flagged) {
+                            flaggedCount++;
+                            const flaggedItem = document.createElement('div');
+                            flaggedItem.className = 'flagged-item';
+                            flaggedItem.innerHTML = `
+                                <p><strong>Topic:</strong> <a href="#" onclick="viewTopic(${topic.id}); return false">${topic.title}</a></p>
+                                <p><strong>Author:</strong> ${reply.author} | <strong>Reported for:</strong> ${reply.flagReason || 'No reason provided'}</p>
+                                <div class="flagged-content-preview" style="padding:10px;background:#f9f9f9;margin:5px 0">
+                                    ${reply.content}
+                                </div>
+                                <div class="admin-actions">
+                                    <button class="btn btn-primary" onclick="resolveFlag(${reply.id}, ${topic.id}, 'keep')">Keep Content</button>
+                                    <button class="btn btn-secondary" onclick="resolveFlag(${reply.id}, ${topic.id}, 'warn')">Warn User</button>
+                                    <button class="btn btn-danger" onclick="resolveFlag(${reply.id}, ${topic.id}, 'delete')">Delete Post</button>
+                                </div>
+                            `;
+                            flaggedPostsList.appendChild(flaggedItem);
+                        }
+                    });
+                });
+                
+                document.getElementById('flag-count').textContent = `(${flaggedCount})`;
+                if (flaggedCount === 0) {
+                    flaggedPostsList.innerHTML = '<p>No flagged content to review.</p>';
+                }
+            }
+
+            /**
+             * Resolve a flag (admin action)
+             */
+            function resolveFlag(replyId, topicId, action) {
+                const topic = topics.find(t => t.id === topicId);
+                if (topic) {
+                    const reply = topic.repliesList.find(r => r.id === replyId);
+                    if (reply) {
+                        if (action === 'delete') {
+                            topic.repliesList = topic.repliesList.filter(r => r.id !== replyId);
+                        } else {
+                            reply.flagged = false;
+                            if (action === 'warn') {
+                                console.log(`Warning sent to user ${reply.author}`);
+                            }
+                        }
+                        loadFlaggedContent();
+                        // Refresh topic view if open
+                        if (document.getElementById('viewTopicTitle').textContent === topic.title) {
+                            viewTopic(topicId);
+                        }
+                    }
+                }
+            }
+
+            // Make functions available globally
+            window.viewTopic = viewTopic;
+            window.editTopic = editTopic;
+            window.editReply = editReply;
+            window.confirmDelete = confirmDelete;
+            window.togglePin = togglePin;
+            window.toggleTopicStatus = toggleTopicStatus;
+            window.showFlagForm = showFlagForm;
+            window.submitFlag = submitFlag;
+            window.loadFlaggedContent = loadFlaggedContent;
+            window.resolveFlag = resolveFlag;
         }
     </script>
 </body>
