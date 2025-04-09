@@ -25,7 +25,7 @@
     }
 
     .container {
-        width: 800px;
+        width: 1000px;
         margin-top: 100px;
         background: white;
         margin-left: 255px;
