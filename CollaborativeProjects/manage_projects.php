@@ -23,7 +23,7 @@
         * {
             box-sizing: border-box;
             margin: 0;
-            padding: 0;
+            padding: 0%px;
         }
         
         body {
@@ -31,12 +31,14 @@
             line-height: 1.6;
             background-color: #f5f7fa;
             color: #333;
+            padding-top: 1500px;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 750px;
             margin: 0 auto;
             padding: 20px;
+            padding-top: 100px;
         }
         
         /* Header */
@@ -88,8 +90,8 @@
         
         /* Dashboard Layout */
         .dashboard-grid {
-            display: grid;
-            grid-template-columns: 300px 1fr;
+            display: flex;
+            /* grid-template-columns: 300px 1fr; */
             gap: 20px;
         }
         

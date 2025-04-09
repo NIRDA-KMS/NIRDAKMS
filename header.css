@@ -454,8 +454,8 @@ body, html {
     background-color: #00a1e4;
     color: white;
     text-align: center;
-    position: fixed; /* Change to fixed if needed */
-    bottom: 0;
+    position: static;
+     bottom: 0;
     width: 100%;
     z-index: 1000;
 }
