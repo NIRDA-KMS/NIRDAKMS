@@ -141,9 +141,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="nested-dropdown">
                             <a href="#" class="nested-dropbtn"><i class="fas fa-project-diagram"></i> Collaborative Projects</a>
                             <div class="nested-dropdown-content">
-                                <a href="create_project.php" onclick="showContent('createProject')"><i class="fas fa-plus-circle"></i> Create Project</a>
-                                <a href="manage_projects.php" onclick="showContent('manageProjects')"><i class="fas fa-tasks"></i> Manage Projects</a>
-                                <a href="project_members.php" onclick="showContent('projectMembers')"><i class="fas fa-user-plus"></i> Manage Members</a>
+                                <a href="../CollaborativeProjects/create_project.php" onclick="showContent('createProject')"><i class="fas fa-plus-circle"></i> Create Project</a>
+                                <a href="../CollaborativeProjects/manage_projects.php" onclick="showContent('manageProjects')"><i class="fas fa-tasks"></i> Manage Projects</a>
+                                <a href="../CollaborativeProjects/project_members.php" onclick="showContent('projectMembers')"><i class="fas fa-user-plus"></i> Manage Members</a>
                             </div>
                         </div>
                         <div class="nested-dropdown">
@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <li class="dropdown">
                     <a href="#" class="dropbtn"><i class="fas fa-user-cog"></i> Users</a>
                     <div class="dropdown-content">
-                        <a href="../Internees' task/Users/add_user.php" onclick="showContent('addUser')"><i class="fas fa-user-plus"></i> Add User</a>
+                        <a href="" onclick="showContent('addUser')"><i class="fas fa-user-plus"></i> Add User</a>
                         <a href="add_role.php" onclick="showContent('addRole')"><i class="fas fa-user-plus"></i> Add Role</a>
                         <a href="manage_users.php" onclick="showContent('manageUser')"><i class="fas fa-user-cog"></i> Manage Users</a>
                         <a href="manage_Roles.php" onclick="showContent('manageRoles')"><i class="fas fa-users-cog"></i> Manage Roles</a>

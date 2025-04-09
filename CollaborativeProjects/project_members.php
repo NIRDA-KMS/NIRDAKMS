@@ -318,6 +318,7 @@
     </style>
 </head>
 <body>
+<?php include("../Internees_task/header.php"); ?>
     <div class="container">
         <div class="header">
             <h1 class="project-title">Website Redesign Project - Team Management</h1>

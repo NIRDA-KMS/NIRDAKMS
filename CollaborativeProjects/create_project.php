@@ -312,6 +312,7 @@
     </style>
 </head>
 <body>
+<?php include("../Internees_task/header.php"); ?>
     <div class="container">
         <!-- Wizard Header -->
         <div class="wizard-header">

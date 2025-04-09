@@ -469,7 +469,7 @@
     </style>
 </head>
 <body>
-    <?php include '../Internees_task/header.php'; ?>
+<?php include('../Internees_task/header.php') ?>
     
     <div class="main-container">
         <div class="forum-layout">
