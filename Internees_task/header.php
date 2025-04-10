@@ -650,8 +650,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="nested-dropdown">
                             <a href="#" class="nested-dropbtn"><i class="fas fa-comment-dots"></i> Chat Management</a>
                             <div class="nested-dropdown-content">
-                                <a href="chat_contacts.php" onclick="showContent('chatContacts')"><i class="fas fa-address-book"></i> Contacts</a>
-                                <a href="online_users.php" onclick="showContent('onlineUsers')"><i class="fas fa-user-circle"></i> Online Users</a>
+                                <a href="../Contact management/chat_contacts.php" onclick="showContent('chatContacts')"><i class="fas fa-address-book"></i> Contacts</a>
+                                <a href="../Contact management/online_users.php" onclick="showContent('onlineUsers')"><i class="fas fa-user-circle"></i> Online Users</a>
                                 <a href="chat_groups.php" onclick="showContent('chatGroups')"><i class="fas fa-users"></i> Manage Groups</a>
                                 <a href="manage_chats.php" onclick="showContent('manageChats')"><i class="fas fa-comments"></i> Manage Chats</a>
                             </div>
