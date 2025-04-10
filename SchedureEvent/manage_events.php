@@ -219,7 +219,7 @@ function getEventStatus($start, $end, $isActive = 1) {
     }
 
     h1 {
-      color: var(--primary-color);
+      /* color: var(--primary-color); */
       margin-bottom: 20px;
     }
 

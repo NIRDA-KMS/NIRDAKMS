@@ -14,7 +14,7 @@
         
         body {
             background-color: #f5f5f5;
-            padding-top: 80px; /* Added padding to account for header */
+            padding-top: 80px;/* Added padding to account for header */
             min-height: 100vh;
         }
         
@@ -29,7 +29,7 @@
         }
         
         h1 {
-            color: #2c3e50;
+            /* color: #2c3e50; */
             margin-bottom: 20px;
             font-size: 24px;
         }

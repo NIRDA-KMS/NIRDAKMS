@@ -8,6 +8,7 @@
 <title style="color: white;">NIRDA Knowledge Management System</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+<!-- <link rel="stylesheet" href="../header.css"> -->
 
 
 <style>
@@ -15,7 +16,9 @@
 
 
 
-:root {
+
+
+    :root {
     --primary-color: #1a237e;
     --secondary-color: #2c3e50;
     --accent-color: #e74c3c;
@@ -44,7 +47,7 @@ body {
     left: 0;
     right: 0;
     z-index: 1100;
-    height: 50px;
+    height: 60px;
 }
 
 .navbar-brand {
@@ -501,8 +504,6 @@ body, html {
         margin: 10px 0;
     }
 }
-
-
 
 
 </style>

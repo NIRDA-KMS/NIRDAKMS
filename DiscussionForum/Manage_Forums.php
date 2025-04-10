@@ -27,8 +27,8 @@
          .main-container {
             
             margin: 80px auto 20px auto;   /*Adjust top margin to be greater than padding-top  */
-            /* padding: 0 15px; */
-            /* padding-left: 25px; */
+            padding: 0 15px; 
+             padding-left: 25px;
             margin-left: 255px;
             margin-right: 100px;
             padding-right: 100px;
