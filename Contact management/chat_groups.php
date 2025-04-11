@@ -378,32 +378,7 @@
         </main>
     </div>
 
-    <!-- Create Group Modal -->
-    <div class="modal" id="createGroupModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create New Group</h3>
-                <button class="close-modal" id="closeGroupModal">&times;</button>
-            </div>
-            <form id="groupForm">
-                <div class="form-group">
-                    <label for="groupName">Group Name</label>
-                    <input type="text" id="groupName" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>Select Members</label>
-                    <div id="groupMembersList" style="max-height: 200px; overflow-y: auto;">
-                        <!-- Members will be listed here -->
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="cancelGroup">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Group</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
+   
     <script>
         // Sample data for different chat types
         const privateChats = [
