@@ -10,6 +10,8 @@ $sql = "CREATE TABLE  schedule_events (
     eventLocation TEXT ,
     eventDescription VARCHAR(255),
     attend TEXT,
+    Recurrence TEXT,
+
     emailReminder VARCHAR(50),
    appReminder VARCHAR(100),
    reminderTime INT

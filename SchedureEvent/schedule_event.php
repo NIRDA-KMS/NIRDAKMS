@@ -54,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
         $attendees = mysqli_real_escape_string($connection, $_POST['attend'] ?? '');
         
         // Handle checkboxes
+        $recurrence = isset($_POST['recurrence']) ;
         $emailReminder = isset($_POST['emailReminder']) ? 1 : 0;
         $appReminder = isset($_POST['appReminder']) ? 1 : 0;
         $reminderTime = isset($_POST['reminderTime']) 
@@ -68,22 +69,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                 eventLocation, 
                 eventDescription, 
                 attend, 
+                recurrence,
                 emailReminder, 
                 appReminder, 
                 reminderTime
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
         
         $stmt = mysqli_prepare($connection, $sql);
         if ($stmt) {
             mysqli_stmt_bind_param(
                 $stmt, 
-                "ssssssiis", 
+                "sssssssiis", 
                 $eventtitle, 
                 $startingdate, 
                 $endingdate, 
                 $location, 
                 $description, 
                 $attendees, 
+                $recurrence,
                 $emailReminder, 
                 $appReminder, 
                 $reminderTime
@@ -496,7 +499,7 @@ mysqli_close($connection);
   <label for="recurringOption">
     <i class="fas fa-repeat"></i> Recurrence
   </label>
-  <select id="recurringOption" name="recurringOption" class="form-control">
+  <select id="recurringOption" name="recurrence" class="form-control">
     <option value="none">None</option>
     <option value="daily">Daily</option>
     <option value="weekly">Weekly</option>

@@ -531,9 +531,9 @@ function getEventStatus($start, $end, $isActive = 1) {
                                             <i class="fas fa-eye<?php echo ($event['isActive'] ?? 1) ? '-slash' : ''; ?>"></i> 
                                             <?php echo ($event['isActive'] ?? 1) ? 'Deactivate' : 'Activate'; ?>
                                         </a>
-                                        <a href="#" class="view-attendees" data-event-id="<?php echo $event['event_id']; ?>">
-                                            <i class="fas fa-users"></i> View Attendees
-                                        </a>
+                                        <a href="view_attendees.php?event_id=<?php echo $event['event_id']; ?>" class="view-attendees">
+    <i class="fas fa-users"></i> View Attendees
+</a>
                                         <a href="#" class="send-reminders" data-event-id="<?php echo $event['event_id']; ?>">
                                             <i class="fas fa-bell"></i> Send Reminders
                                         </a>
