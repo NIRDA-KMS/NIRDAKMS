@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                 eventDescription, 
                 attend, 
                 recurrence,
-                emailReminder, 
+                emailReminder,  
                 appReminder, 
                 reminderTime
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
