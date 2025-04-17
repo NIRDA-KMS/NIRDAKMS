@@ -9,7 +9,7 @@ $dbname = 'NIRDAKMS';      // Database name
 $connection = mysqli_connect($host, $user, $pass, $dbname);
 
     if($connection){
-        echo "connected";
+        // echo "connected";
     }
     else{
         echo"could not connect to NIRDAKMS";
