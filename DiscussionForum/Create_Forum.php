@@ -1,3 +1,131 @@
+<?php
+// Start session and include header
+session_start();
+include('../Internees_task/header.php');
+
+// Database connection
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "NIRDAKMS";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Initialize variables
+$error = '';
+$success = '';
+$users = [];
+$groups = [];
+
+// Check if user is logged in (add your own authentication logic)
+// if (!isset($_SESSION['user_id'])) {
+//     header("Location: login.php");
+//     exit();
+// }
+
+// Get users and groups for access control
+// $users_result = $conn->query("SELECT id, username FROM users");
+// if ($users_result) {
+//     $users = $users_result->fetch_all(MYSQLI_ASSOC);
+// }
+
+// Get active users for selection dropdown
+$users_result = $conn->query("
+    SELECT user_id, username, full_name 
+    FROM users 
+    WHERE is_active = 1
+    ORDER BY full_name
+");
+
+$users = [];
+if ($users_result && $users_result->num_rows > 0) {
+    $users = $users_result->fetch_all(MYSQLI_ASSOC);
+}
+
+// $groups_result = $conn->query("SELECT id, name FROM groups");
+// if ($groups_result) {
+//     $groups = $groups_result->fetch_all(MYSQLI_ASSOC);
+// }
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $category_name = $conn->real_escape_string($_POST['categoryName']);
+    $description = $conn->real_escape_string($_POST['categoryDescription']);
+    $permission = $conn->real_escape_string($_POST['access']);
+    
+    // Initialize empty arrays for selections
+    $selected_users = [];
+    $selected_groups = [];
+    
+    // Process selected users if private access
+    if ($permission === 'private' && isset($_POST['userSelect'])) {
+        // Validate each selected user exists in database
+        $valid_users = [];
+        foreach ($_POST['userSelect'] as $user_id) {
+            $user_id = (int)$user_id;
+            $result = $conn->query("SELECT user_id FROM users WHERE user_id = $user_id AND is_active = 1");
+            if ($result && $result->num_rows > 0) {
+                $valid_users[] = $user_id;
+            }
+        }
+        $selected_users = $valid_users;
+    }
+    
+    // Process selected groups if restricted access
+    if ($permission === 'restricted' && isset($_POST['groupSelect'])) {
+        $selected_groups = array_map('intval', $_POST['groupSelect']);
+    }
+    
+    // Convert arrays to comma-separated strings for database storage
+    $users_str = implode(",", $selected_users);
+    $groups_str = implode(",", $selected_groups);
+// }else {
+//         $groups_str = "";
+//     }
+//     if ($permission === 'private' && isset($_POST['userSelect'])) {
+//     $selected_users = validateUserIds($conn, $_POST['userSelect']);
+// }
+    
+    // Insert into database
+    $sql = "INSERT INTO create_forum (category_name, description, permission, selected_users, selected_groups) 
+            VALUES ('$category_name', '$description', '$permission', '$users_str', '$groups_str')";
+    
+    if ($conn->query($sql)) {
+        $success = "Forum category created successfully!";
+    } else {
+        $error = "Error creating forum: " . $conn->error;
+    }
+}    
+
+// Add User Validation Function
+
+function validateUserIds($conn, $user_ids) {
+    if (empty($user_ids)) return [];
+    
+    $ids = array_map('intval', $user_ids);
+    $ids_str = implode(",", $ids);
+    
+    $result = $conn->query("SELECT user_id FROM users WHERE user_id IN ($ids_str) AND is_active = 1");
+    $valid_ids = [];
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $valid_ids[] = $row['user_id'];
+        }
+    }
+    
+    return $valid_ids;
+}
+
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,13 +142,13 @@
         
         body {
             background-color: #f5f5f5;
-            padding-top: 80px;/* Added padding to account for header */
+            padding-top: 80px;
             min-height: 100vh;
         }
         
         .container {
             max-width: 800px;
-            margin: 100px auto; /* Added margin to separate from header */
+            margin: 100px auto;
             background: white;
             padding: 30px;
             padding-top: 50px;
@@ -29,7 +157,6 @@
         }
         
         h1 {
-            /* color: #2c3e50; */
             margin-bottom: 20px;
             font-size: 24px;
         }
@@ -144,11 +271,9 @@
             color: #e74c3c;
             font-size: 14px;
             margin-top: 5px;
-            display: none;
         }
         
         .success-message {
-            display: none;
             padding: 15px;
             background: #2ecc71;
             color: white;
@@ -159,7 +284,7 @@
         /* Responsive adjustments */
         @media (max-width: 768px) {
             body {
-                padding-top: 60px; /* Less padding for smaller headers */
+                padding-top: 60px;
             }
             
             .container {
@@ -170,24 +295,27 @@
     </style>
 </head>
 <body>
-    <?php include('../Internees_task/header.php') ?>
     <div class="container">
         <h1>Create New Forum Category</h1>
         
-        <div class="success-message" id="successMessage">
-            Forum category created successfully!
-        </div>
+        <?php if ($success): ?>
+            <div class="success-message"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
         
-        <form id="forumForm">
+        <?php if ($error): ?>
+            <div class="error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        
+        <form id="forumForm" method="POST" action="create_forum.php">
             <div class="form-group">
                 <label for="categoryName">Category Name</label>
-                <input type="text" id="categoryName" required>
+                <input type="text" id="categoryName" name="categoryName" required>
                 <div class="error" id="nameError">Please enter a category name</div>
             </div>
             
             <div class="form-group">
                 <label for="categoryDescription">Description</label>
-                <textarea id="categoryDescription" required></textarea>
+                <textarea id="categoryDescription" name="categoryDescription" required></textarea>
                 <div class="error" id="descError">Please enter a description</div>
             </div>
             
@@ -209,24 +337,25 @@
                 </div>
                 
                 <div class="access-controls" id="privateControls">
-                    <label>Select Users</label>
-                    <select multiple class="multi-select" id="userSelect">
-                        <option value="user1">John Doe (Admin)</option>
-                        <option value="user2">Jane Smith (Moderator)</option>
-                        <option value="user3">Bob Johnson (Member)</option>
-                        <option value="user4">Alice Williams (Member)</option>
-                    </select>
-                    <div class="error" id="privateError">Please select at least one user</div>
-                </div>
+    <label>Select Users</label>
+    <select multiple class="multi-select" id="userSelect" name="userSelect[]">
+        <?php foreach ($users as $user): ?>
+            <option value="<?php echo htmlspecialchars($user['user_id']); ?>">
+                <?php echo htmlspecialchars($user['full_name'] . ' (' . $user['username'] . ')'); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+    <div class="error" id="privateError">Please select at least one user</div>
+</div>
                 
                 <div class="access-controls" id="restrictedControls">
                     <label>Select Groups</label>
-                    <select multiple class="multi-select" id="groupSelect">
-                        <option value="group1">Administrators</option>
-                        <option value="group2">Moderators</option>
-                        <option value="group3">Engineering</option>
-                        <option value="group4">Marketing</option>
-                        <option value="group5">Sales</option>
+                    <select multiple class="multi-select" id="groupSelect" name="groupSelect[]">
+                        <?php foreach ($groups as $group): ?>
+                            <option value="<?php echo $group['id']; ?>">
+                                <?php echo htmlspecialchars($group['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                     <div class="error" id="restrictedError">Please select at least one group</div>
                 </div>
@@ -276,15 +405,6 @@
                 if (validateForm(true)) {
                     updatePreview();
                     previewSection.style.display = 'block';
-                }
-            });
-            
-            // Form submission
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                if (validateForm()) {
-                    submitForm();
                 }
             });
             
@@ -352,40 +472,18 @@
                 document.getElementById('previewAccess').textContent = accessText;
             }
             
-            // AJAX Form submission
-            function submitForm() {
-                const formData = {
-                    name: document.getElementById('categoryName').value.trim(),
-                    description: document.getElementById('categoryDescription').value.trim(),
-                    access: document.querySelector('input[name="access"]:checked').value,
-                    users: [],
-                    groups: []
-                };
-                
-                if (formData.access === 'private') {
-                    formData.users = Array.from(document.getElementById('userSelect').selectedOptions)
-                        .map(opt => opt.value);
-                } else if (formData.access === 'restricted') {
-                    formData.groups = Array.from(document.getElementById('groupSelect').selectedOptions)
-                        .map(opt => opt.value);
+            // Cancel button functionality
+            document.getElementById('cancelBtn').addEventListener('click', function() {
+                if (confirm('Are you sure you want to cancel? All unsaved changes will be lost.')) {
+                    window.location.href = 'manage_forums.php';
                 }
-                
-                // Simulate AJAX call
-                console.log('Submitting form data:', formData);
-                
-                // Show success message (in real app, this would be after successful AJAX response)
-                successMessage.style.display = 'block';
-                form.reset();
-                previewSection.style.display = 'none';
-                privateControls.style.display = 'none';
-                restrictedControls.style.display = 'none';
-                
-                // Hide success message after 3 seconds
-                setTimeout(() => {
-                    successMessage.style.display = 'none';
-                }, 3000);
-            }
+            });
         });
     </script>
 </body>
 </html>
+
+<?php
+// Close database connection
+$conn->close();
+?>
