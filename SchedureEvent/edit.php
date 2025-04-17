@@ -108,7 +108,9 @@ function getEventStatus($start, $end, $isActive = 1) {
 
     .container {
       max-width: 900px;
-      margin: auto;
+      margin-top: 100px;
+      margin-left: 255px;
+      margin-bottom: 100px;
       background: white;
       padding: 20px;
       border-radius: 8px;
