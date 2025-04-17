@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <img src="images/nirda_logo.png" alt="NIRDA Knowledge Management System">
                 </div>
             </div>
-            <span class="navbar-title"><h1>NIRDA Knowledge Hub - <?php echo isset($page_title) ? $page_title : 'Dashboard'; ?></h1></span>
+            <span class="navbar-title"><h1 style="color:#fff;">NIRDA Knowledge Hub - <?php echo isset($page_title) ? $page_title : 'Dashboard'; ?></h1></span>
         </div>
         <div class="navbar-icons">
             <a href="#"><i class="fas fa-search"></i></a>
