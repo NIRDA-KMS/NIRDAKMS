@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['error'] = 'Error updating event: ' . mysqli_error($connection);
         }
         
-        header("Location: ".$_SERVER['PHP_SELF']."?page=".$_GET['page']);
+        header("Location: manage_events.php");
         exit();
     }
 }
@@ -195,15 +195,6 @@ function getEventStatus($start, $end, $isActive = 1) {
     .btn-cancel {
       background-color: #F44336;
     }
-
-
-
-
-
-
-
-
-
 
 
 
