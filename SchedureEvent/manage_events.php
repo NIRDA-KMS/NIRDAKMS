@@ -724,6 +724,59 @@ $(document).ready(function() {
     }
 });
 
+    // Add the "Send Reminders" functionality here
+    $(document).on('click', '.send-reminders', function(e) {
+    e.preventDefault();
+    const eventId = $(this).data('event-id');
+
+    if (!eventId) {
+        Swal.fire('Error', 'Invalid event ID.', 'error');
+        return;
+    }
+
+    Swal.fire({
+        title: 'Send Reminders?',
+        text: 'Are you sure you want to send reminders for this event?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, send it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Sending...',
+                text: 'Please wait while reminders are being sent.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: 'send_reminders.php',
+                type: 'POST',
+                data: { event_id: eventId },
+                success: function(response) {
+                    Swal.close(); // Close the loading spinner
+                    try {
+                        const res = JSON.parse(response);
+                        if (res.success) {
+                            Swal.fire('Success', res.message, 'success');
+                        } else {
+                            Swal.fire('Error', res.message, 'error');
+                        }
+                    } catch (e) {
+                        Swal.fire('Error', 'Invalid response from server.', 'error');
+                    }
+                },
+                error: function() {
+                    Swal.close(); // Close the loading spinner
+                    Swal.fire('Error', 'An error occurred while sending reminders.', 'error');
+                }
+            });
+        }
+    });
+});
 
 
 
