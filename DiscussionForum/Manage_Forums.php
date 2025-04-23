@@ -1,3 +1,10 @@
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,7 +79,8 @@
         .category-list a {
             color: #3498db;
             text-decoration: none;
-            transition: color 0.3s;
+        transition: color 0.3s;
+
         }
 
         .category-list a:hover {
@@ -255,6 +263,28 @@
             opacity: 0;
             width: 0;
             height: 0;
+        }
+
+        .subscription-controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .subscribe-btn, .unsubscribe-btn {
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .subscribe-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+        }
+        .unsubscribe-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
         }
 
         .slider {
@@ -480,19 +510,16 @@
             <aside class="sidebar">
                 <div class="category-list">
                     <h3>Categories</h3>
-                    <ul>
-                        <li><a href="#">General Discussion</a></li>
-                        <li><a href="#">Technical Support</a></li>
-                        <li><a href="#">Feature Requests</a></li>
-                        <li><a href="#">Announcements</a></li>
+                    <ul id="categoryList">
+                        <!-- Categories will be loaded via API -->
                     </ul>
                 </div>
                 
                 <div class="forum-stats">
                     <h3>Forum Statistics</h3>
-                    <p>Topics: 124</p>
-                    <p>Posts: 892</p>
-                    <p>Members: 342</p>
+                    <p>Topics: <span id="topicCount">0</span></p>
+                    <p>Posts: <span id="postCount">0</span></p>
+                    <p>Members: <span id="memberCount">0</span></p>
                 </div>
             </aside>
             
@@ -503,12 +530,14 @@
                 </div>
                 
                 <div class="topic-list" id="topicList">
-                    <!-- Topics will be loaded here -->
+                    <!-- Topics will be loaded via API -->
                 </div>
 
-                <button class="btn btn-primary review-report-btn" id="reviewReports">
-                    Review Reports
-                </button>
+                <div id="moderationControls" style="display: none;">
+                    <button class="btn btn-primary review-report-btn" id="reviewReports">
+                        Review Reports
+                    </button>
+                </div>
             </main>
         </div>
     </div>
@@ -520,12 +549,9 @@
             <form id="topicForm">
                 <div class="form-group">
                     <label for="topicCategory">Category</label>
-                    <select id="topicCategory" required>
+                    <select id="topicCategory">
                         <option value="">Select a category</option>
-                        <option value="1">General Discussion</option>
-                        <option value="2">Technical Support</option>
-                        <option value="3">Feature Requests</option>
-                        <option value="4">Announcements</option>
+                        <!-- Categories will be loaded via API -->
                     </select>
                 </div>
                 
@@ -559,7 +585,7 @@
             
             <div class="topic-replies" id="topicReplies">
                 <h3>Replies</h3>
-                <!-- Replies will be loaded here -->
+                <!-- Replies will be loaded via API -->
             </div>
             
             <div class="reply-form" style="margin-top: 20px;">
@@ -584,23 +610,34 @@
             <div class="admin-tab-content active" id="flaggedContent" style="margin-top: 20px;">
                 <h3>Flagged Posts <span id="flag-count">(0)</span></h3>
                 <div class="flagged-posts-list" id="flaggedPostsList">
-                    <!-- Flagged posts will be loaded here -->
+                    <!-- Flagged posts will be loaded via API -->
                 </div>
             </div>
             
             <div class="admin-tab-content" id="usersContent" style="margin-top: 20px;">
                 <h3>User Management</h3>
-                <p>User management content goes here</p>
+                <div id="userManagementContent">
+                    <!-- User management content will be loaded here -->
+                </div>
             </div>
             
             <div class="admin-tab-content" id="categoriesContent" style="margin-top: 20px;">
                 <h3>Category Management</h3>
-                <p>Category management content goes here</p>
+                <div id="categoryManagementContent">
+                    <!-- Category management content will be loaded here -->
+                </div>
             </div>
         </div>
     </div>
     
     <script>
+        // Global variables
+        let currentUserRole = <?php echo isset($_SESSION['role_id']) ? $_SESSION['role_id'] : 0; ?>;
+        let currentUserId = <?php echo isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0; ?>;
+        let currentTopicId = null;
+        let currentTopicSubscribed = false;
+        const API_BASE_URL = 'forum_api.php';
+
         // Document Ready Function
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize TinyMCE
@@ -608,11 +645,18 @@
             
             // Initialize the application
             initApp();
+            
+            // Load initial data
+            loadForumStats();
+            loadCategories();
+            loadTopics();
+            
+            // Show moderation controls if user is admin/moderator
+            if (currentUserRole === 1 || currentUserRole === 2) {
+                document.getElementById('moderationControls').style.display = 'block';
+            }
         });
 
-        /**
-         * Initialize TinyMCE editor
-         */
         function initTinyMCE() {
             tinymce.init({
                 selector: '#topicContent',
@@ -623,9 +667,6 @@
             });
         }
 
-        /**
-         * Main application initialization
-         */
         function initApp() {
             // DOM Elements
             const createTopicBtn = document.getElementById('createTopicBtn');
@@ -636,210 +677,176 @@
             const reviewReportsBtn = document.getElementById('reviewReports');
             const reviewReportsModal = document.getElementById('reviewReportsModal');
             const topicViewModal = document.getElementById('topicViewModal');
-            
-            // Sample Data (in a real app, this would come from an API)
-            const topics = [
-                {
-                    id: 1,
-                    title: "How to use the new forum features?",
-                    category: "General Discussion",
-                    author: "admin",
-                    date: "2023-05-15",
-                    replies: 5,
-                    views: 124,
-                    pinned: true,
-                    active: true,
-                    content: "<p>Welcome to our new forum! Here's how to use the new features...</p>",
-                    repliesList: [
-                        {
-                            id: 101,
-                            author: "user1",
-                            date: "2023-05-16",
-                            content: "Thanks for the guide! Very helpful.",
-                            flagged: false
-                        },
-                        {
-                            id: 102,
-                            author: "user2",
-                            date: "2023-05-17",
-                            content: "I'm having trouble with the editor. Can you help?",
-                            flagged: true,
-                            flagReason: "Request for help"
-                        }
-                    ]
-                },
-                {
-                    id: 2,
-                    title: "Bug report: Login issues",
-                    category: "Technical Support",
-                    author: "user3",
-                    date: "2023-05-14",
-                    replies: 3,
-                    views: 87,
-                    pinned: false,
-                    active: true,
-                    content: "<p>I'm experiencing issues when trying to log in...</p>",
-                    repliesList: [
-                        {
-                            id: 201,
-                            author: "admin",
-                            date: "2023-05-14",
-                            content: "We're looking into this issue. Thanks for reporting.",
-                            flagged: false
-                        }
-                    ]
-                }
-            ];
+            const submitReplyBtn = document.getElementById('submitReply');
             
             // Event Listeners
             createTopicBtn.addEventListener('click', showCreateTopicModal);
             cancelTopicBtn.addEventListener('click', hideCreateTopicModal);
             reviewReportsBtn.addEventListener('click', showReviewReportsModal);
             topicForm.addEventListener('submit', handleTopicFormSubmit);
+            submitReplyBtn.addEventListener('click', handleReplySubmit);
             
             // Close modals when clicking outside
             document.addEventListener('click', handleModalOutsideClick);
             
             // Admin tab switching
             setupAdminTabs();
-            
-            // Initialize the page
-            loadTopics();
-            
-            /**
-             * Show create topic modal
-             */
-            function showCreateTopicModal() {
-                createTopicModal.style.display = 'flex';
-            }
+        }
 
-            /**
-             * Hide create topic modal
-             */
-            function hideCreateTopicModal() {
-                createTopicModal.style.display = 'none';
-            }
-
-            /**
-             * Show review reports modal
-             */
-            function showReviewReportsModal(e) {
-                e.preventDefault();
-                reviewReportsModal.style.display = 'flex';
-                loadFlaggedContent();
-            }
-
-            /**
-             * Handle topic form submission
-             */
-            function handleTopicFormSubmit(e) {
-                e.preventDefault();
-                createNewTopic();
-            }
-
-            /**
-             * Handle modal outside click
-             */
-            function handleModalOutsideClick(e) {
-                if (e.target.classList.contains('modal')) {
-                    e.target.style.display = 'none';
-                }
-            }
-
-            /**
-             * Setup admin tabs functionality
-             */
-            function setupAdminTabs() {
-                document.querySelectorAll('.admin-tab').forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        // Update tab styles
-                        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-                        tab.classList.add('active');
-                        
-                        // Update content visibility
-                        document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
-                        document.getElementById(`${tab.dataset.tab}Content`).classList.add('active');
-                    });
-                });
-            }
-
-            /**
-             * Load topics into the topic list
-             */
-            function loadTopics() {
-                topicList.innerHTML = '';
-                
-                if (topics.length === 0) {
-                    topicList.innerHTML = '<p>No topics found.</p>';
-                    return;
-                }
-                
-                topics.forEach(topic => {
-                    const topicElement = document.createElement('div');
-                    topicElement.className = `topic-item ${topic.active ? '' : 'deactivated'}`;
-                    topicElement.innerHTML = `
-                        <h3 class="topic-title">${topic.title} 
-                            ${topic.pinned ? '<span class="pinned-badge">Pinned</span>' : ''}
-                            ${!topic.active ? '<span class="pinned-badge" style="background:#95a5a6">Hidden</span>' : ''}
-                        </h3>
-                        <div class="topic-meta">Posted by ${topic.author} in ${topic.category} on ${topic.date}</div>
-                        <div class="topic-stats">
-                            <span>${topic.replies} replies</span>
-                            <span>${topic.views} views</span>
-                        </div>
-                        <div class="mod-controls">
-                            <button class="mod-btn" onclick="viewTopic(${topic.id})">View</button>
-                            <button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
-                            <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>
-                            <button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
-                                ${topic.pinned ? 'Unpin' : 'Pin'}
-                            </button>
-                            <div class="status-toggle">
-                                <label class="switch">
-                                    <input type="checkbox" ${topic.active ? 'checked' : ''} onchange="toggleTopicStatus(${topic.id}, this.checked)">
-                                    <span class="slider"></span>
-                                </label>
-                                <span>${topic.active ? 'Active' : 'Hidden'}</span>
-                            </div>
-                        </div>
-                    `;
+        function loadForumStats() {
+            fetch(`${API_BASE_URL}?action=get_stats`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error(data.error);
+                        return;
+                    }
                     
-                    topicList.appendChild(topicElement);
-                });
-            }
+                    document.getElementById('topicCount').textContent = data.topics || 0;
+                    document.getElementById('postCount').textContent = data.posts || 0;
+                    document.getElementById('memberCount').textContent = data.members || 0;
+                })
+                .catch(error => console.error('Error loading forum stats:', error));
+        }
 
-            /**
-             * View a specific topic
-             */
-            function viewTopic(topicId) {
-                const topic = topics.find(t => t.id === topicId);
-                if (!topic) {
-                    alert('Topic not found');
+        function loadCategories() {
+            fetch(`${API_BASE_URL}?action=get_categories`)
+                .then(response => response.json())
+                .then(categories => {
+                    const categoryList = document.getElementById('categoryList');
+                    const categoryDropdown = document.getElementById('topicCategory');
+                    
+                    // Clear existing options except the first one
+                    while (categoryDropdown.options.length > 1) {
+                        categoryDropdown.remove(1);
+                    }
+                    
+                    categoryList.innerHTML = '';
+                    
+                    if (categories.length === 0) {
+                        categoryList.innerHTML = '<li>No categories found</li>';
+                        return;
+                    }
+                    
+                    categories.forEach(category => {
+                        // Add to sidebar
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `<a href="#" onclick="loadTopics(${category.category_id}); return false">${category.name}</a>`;
+                        categoryList.appendChild(listItem);
+                        
+                        // Add to dropdown
+                        const option = document.createElement('option');
+                        option.value = category.category_id;
+                        option.textContent = category.name;
+                        categoryDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading categories:', error));
+        }
+
+        function loadTopics(categoryId = null) {
+            let url = `${API_BASE_URL}?action=get_topics`;
+            if (categoryId) {
+                url += `&category_id=${categoryId}`;
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(topics => {
+                    const topicList = document.getElementById('topicList');
+                    topicList.innerHTML = '';
+                    
+                    if (topics.length === 0) {
+                        topicList.innerHTML = '<p>No topics found.</p>';
+                        return;
+                    }
+                    
+                    topics.forEach(topic => {
+                        const topicElement = document.createElement('div');
+                        topicElement.className = `topic-item ${topic.active ? '' : 'deactivated'}`;
+                        topicElement.innerHTML = `
+                            <h3 class="topic-title">${topic.title} 
+                                ${topic.pinned ? '<span class="pinned-badge">Pinned</span>' : ''}
+                                ${!topic.active ? '<span class="pinned-badge" style="background:#95a5a6">Hidden</span>' : ''}
+                            </h3>
+                            <div class="topic-meta">Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}</div>
+                            <div class="topic-stats">
+                                <span>${topic.reply_count} replies</span>
+                            </div>
+                            <div class="mod-controls">
+                                <button class="mod-btn" onclick="viewTopic(${topic.id})">View</button>
+                                ${(currentUserRole === 1 || currentUserRole === 2 || topic.author.id === currentUserId) ? 
+                                    `<button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
+                                     <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>` : ''}
+                                ${(currentUserRole === 1 || currentUserRole === 2) ? 
+                                    `<button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
+                                        ${topic.pinned ? 'Unpin' : 'Pin'}
+                                    </button>
+                                    <div class="status-toggle">
+                                        <label class="switch">
+                                            <input type="checkbox" ${topic.active ? 'checked' : ''} onchange="toggleTopicStatus(${topic.id}, this.checked)">
+                                            <span class="slider"></span>
+                                        </label>
+                                        <span>${topic.active ? 'Active' : 'Hidden'}</span>
+                                    </div>` : ''}
+                            </div>
+                        `;
+                        
+                        topicList.appendChild(topicElement);
+                    });
+                })
+                .catch(error => console.error('Error loading topics:', error));
+        }
+
+        function viewTopic(topicId) {
+            currentTopicId = topicId;
+            
+            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
                     return;
                 }
                 
+                const topic = data.topic;
                 document.getElementById('viewTopicTitle').textContent = topic.title;
                 document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
                 document.getElementById('viewTopicMeta').innerHTML = `
-                    Posted by ${topic.author} in ${topic.category} on ${topic.date}
+                    Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
                 `;
                 document.getElementById('viewTopicContent').innerHTML = topic.content;
+
+                // Check subscription status
+                currentTopicSubscribed = data.is_subscribed;
+                updateSubscriptionButton();
                 
                 // Load replies
                 const repliesContainer = document.getElementById('topicReplies');
                 repliesContainer.innerHTML = '<h3>Replies</h3>';
+
+                // Add subscription controls
+                const subscriptionControls = document.createElement('div');
+                subscriptionControls.className = 'subscription-controls';
+                subscriptionControls.innerHTML = `
+                    <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
+                    <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
+                repliesContainer.appendChild(subscriptionControls);
                 
-                if (topic.repliesList.length === 0) {
+                if (data.replies.length === 0) {
                     repliesContainer.innerHTML += '<p>No replies yet.</p>';
                 } else {
-                    topic.repliesList.forEach(reply => {
+                    data.replies.forEach(reply => {
                         const replyElement = document.createElement('div');
                         replyElement.className = `reply ${reply.flagged ? 'flagged' : ''}`;
                         replyElement.innerHTML = `
                             <div class="reply-content">${reply.content}</div>
                             <div class="reply-meta">
-                                Posted by ${reply.author} on ${reply.date}
-                                <button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>
+                                Posted by ${reply.author.name} on ${new Date(reply.created_at).toLocaleDateString()}
+                                ${reply.author.id !== currentUserId ? 
+                                    `<button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>` : ''}
                             </div>
                             <div class="flag-form" id="flag-form-${reply.id}">
                                 <select id="flag-reason-${reply.id}" style="margin-bottom:5px; width:100%">
@@ -850,249 +857,469 @@
                                 </select>
                                 <button class="btn btn-primary" onclick="submitFlag(${reply.id}, ${topicId})">Submit Report</button>
                             </div>
-                            <div class="mod-controls">
-                                <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
-                                <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
-                            </div>
+                            ${(currentUserRole === 1 || currentUserRole === 2 || reply.author.id === currentUserId) ? 
+                                `<div class="mod-controls">
+                                    <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
+                                    <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
+                                </div>` : ''}
                         `;
                         repliesContainer.appendChild(replyElement);
                     });
                 }
                 
-                // Set up reply submission
-                document.getElementById('submitReply').onclick = () => {
-                    const replyContent = document.getElementById('replyContent').value;
-                    if (replyContent.trim()) {
-                        // In a real app, this would be an API call
-                        topic.repliesList.push({
-                            id: Math.floor(Math.random() * 1000),
-                            author: "current_user",
-                            date: new Date().toISOString().split('T')[0],
-                            content: replyContent,
-                            flagged: false
-                        });
-                        
-                        document.getElementById('replyContent').value = '';
-                        viewTopic(topicId); // Refresh the view
-                    }
-                };
-                
-                topicViewModal.style.display = 'flex';
-            }
+                // Add event listeners for subscription buttons
+                document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
+                document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
+                document.getElementById('topicViewModal').style.display = 'flex';
+            })
+            .catch(error => {
+                console.error('Error loading topic:', error);
+                alert('Failed to load topic');
+            });
+        }
 
-            /**
-             * Create a new topic
-             */
-            function createNewTopic() {
-                const category = document.getElementById('topicCategory').value;
-                const title = document.getElementById('topicTitle').value;
-                const content = tinymce.get('topicContent').getContent();
-                
-                if (!category || !title || !content) {
-                    alert('Please fill in all fields');
+        function updateSubscriptionButton() {
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+            
+            if (subscribeBtn && unsubscribeBtn) {
+                subscribeBtn.style.display = currentTopicSubscribed ? 'none' : 'block';
+                unsubscribeBtn.style.display = currentTopicSubscribed ? 'block' : 'none';
+            }
+        }
+
+        function subscribeToTopic(topicId) {
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'subscribe_topic',
+                    topic_id: topicId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
                     return;
                 }
                 
-                // In a real app, this would be an API call
-                const newTopic = {
-                    id: topics.length + 1,
-                    title,
-                    category: document.getElementById('topicCategory').options[document.getElementById('topicCategory').selectedIndex].text,
-                    author: "current_user",
-                    date: new Date().toISOString().split('T')[0],
-                    replies: 0,
-                    views: 0,
-                    pinned: false,
-                    active: true,
-                    content,
-                    repliesList: []
-                };
-                
-                topics.unshift(newTopic);
-                loadTopics();
-                
-                // Reset form
-                document.getElementById('topicCategory').value = '';
-                document.getElementById('topicTitle').value = '';
-                tinymce.get('topicContent').setContent('');
-                
-                createTopicModal.style.display = 'none';
-            }
+                currentTopicSubscribed = true;
+                updateSubscriptionButton();
+                alert('You have subscribed to this topic');
+            })
+            .catch(error => {
+                console.error('Error subscribing to topic:', error);
+                alert('Failed to subscribe');
+            });
+        }
 
-            /**
-             * Edit a topic
-             */
-            function editTopic(topicId) {
-                const topic = topics.find(t => t.id === topicId);
-                if (!topic) return;
-                
-                // In a real app, this would open an edit form
-                alert(`Edit functionality for topic ${topicId} would open an edit form`);
-            }
-
-            /**
-             * Edit a reply
-             */
-            function editReply(replyId, topicId) {
-                // In a real app, this would open an edit form
-                alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
-            }
-
-            /**
-             * Confirm deletion of a topic or reply
-             */
-            function confirmDelete(id, isTopic) {
-                if (confirm(`Are you sure you want to delete this ${isTopic ? 'topic' : 'reply'}?`)) {
-                    // In a real app, this would be an API call
-                    if (isTopic) {
-                        const index = topics.findIndex(t => t.id === id);
-                        if (index !== -1) {
-                            topics.splice(index, 1);
-                            loadTopics();
-                        }
-                    } else {
-                        // Find the reply in any topic and delete it
-                        for (const topic of topics) {
-                            const index = topic.repliesList.findIndex(r => r.id === id);
-                            if (index !== -1) {
-                                topic.repliesList.splice(index, 1);
-                                // Refresh if we're viewing this topic
-                                if (topicViewModal.style.display === 'flex') {
-                                    const currentTopicId = parseInt(document.getElementById('viewTopicTitle').dataset.topicId);
-                                    if (currentTopicId === topic.id) {
-                                        viewTopic(topic.id);
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
+        function unsubscribeFromTopic(topicId) {
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'unsubscribe_topic',
+                    topic_id: topicId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
                 }
-            }
-
-            /**
-             * Toggle pin status of a topic
-             */
-            function togglePin(topicId, currentlyPinned) {
-                const topic = topics.find(t => t.id === topicId);
-                if (topic) {
-                    topic.pinned = !currentlyPinned;
-                    loadTopics();
-                }
-            }
-
-            /**
-             * Toggle active status of a topic
-             */
-            function toggleTopicStatus(topicId, isActive) {
-                const topic = topics.find(t => t.id === topicId);
-                if (topic) {
-                    topic.active = isActive;
-                    loadTopics();
-                }
-            }
-
-            /**
-             * Show flag form for a reply
-             */
-            function showFlagForm(replyId) {
-                document.querySelectorAll('.flag-form').forEach(form => form.style.display = 'none');
-                document.getElementById(`flag-form-${replyId}`).style.display = 'block';
-            }
-
-            /**
-             * Submit a flag for a reply
-             */
-            function submitFlag(replyId, topicId) {
-                const reason = document.getElementById(`flag-reason-${replyId}`).value;
-                const topic = topics.find(t => t.id === topicId);
-                if (topic) {
-                    const reply = topic.repliesList.find(r => r.id === replyId);
-                    if (reply) {
-                        reply.flagged = true;
-                        reply.flagReason = reason;
-                        alert('Thank you for reporting. Moderators will review this content.');
-                        // Refresh flagged content list if admin panel is open
-                        if (reviewReportsModal.style.display === 'flex') {
-                            loadFlaggedContent();
-                        }
-                    }
-                }
-            }
-
-            /**
-             * Load flagged content for admin review
-             */
-            function loadFlaggedContent() {
-                let flaggedCount = 0;
-                const flaggedPostsList = document.getElementById('flaggedPostsList');
-                flaggedPostsList.innerHTML = '';
                 
-                topics.forEach(topic => {
-                    topic.repliesList.forEach(reply => {
-                        if (reply.flagged) {
-                            flaggedCount++;
-                            const flaggedItem = document.createElement('div');
-                            flaggedItem.className = 'flagged-item';
-                            flaggedItem.innerHTML = `
-                                <p><strong>Topic:</strong> <a href="#" onclick="viewTopic(${topic.id}); return false">${topic.title}</a></p>
-                                <p><strong>Author:</strong> ${reply.author} | <strong>Reported for:</strong> ${reply.flagReason || 'No reason provided'}</p>
-                                <div class="flagged-content-preview" style="padding:10px;background:#f9f9f9;margin:5px 0">
-                                    ${reply.content}
-                                </div>
-                                <div class="admin-actions">
-                                    <button class="btn btn-primary" onclick="resolveFlag(${reply.id}, ${topic.id}, 'keep')">Keep Content</button>
-                                    <button class="btn btn-secondary" onclick="resolveFlag(${reply.id}, ${topic.id}, 'warn')">Warn User</button>
-                                    <button class="btn btn-danger" onclick="resolveFlag(${reply.id}, ${topic.id}, 'delete')">Delete Post</button>
-                                </div>
-                            `;
-                            flaggedPostsList.appendChild(flaggedItem);
-                        }
-                    });
-                });
-                
-                document.getElementById('flag-count').textContent = `(${flaggedCount})`;
-                if (flaggedCount === 0) {
-                    flaggedPostsList.innerHTML = '<p>No flagged content to review.</p>';
-                }
-            }
+                currentTopicSubscribed = false;
+                updateSubscriptionButton();
+                alert('You have unsubscribed from this topic');
+            })
+            .catch(error => {
+                console.error('Error unsubscribing from topic:', error);
+                alert('Failed to unsubscribe');
+            });
+        }
 
-            /**
-             * Resolve a flag (admin action)
-             */
-            function resolveFlag(replyId, topicId, action) {
-                const topic = topics.find(t => t.id === topicId);
-                if (topic) {
-                    const reply = topic.repliesList.find(r => r.id === replyId);
-                    if (reply) {
-                        if (action === 'delete') {
-                            topic.repliesList = topic.repliesList.filter(r => r.id !== replyId);
-                        } else {
-                            reply.flagged = false;
-                            if (action === 'warn') {
-                                console.log(`Warning sent to user ${reply.author}`);
-                            }
-                        }
+        function showCreateTopicModal() {
+            document.getElementById('createTopicModal').style.display = 'flex';
+        }
+
+        function hideCreateTopicModal() {
+            document.getElementById('createTopicModal').style.display = 'none';
+        }
+
+// In your handleTopicFormSubmit function, update it to:
+
+function handleTopicFormSubmit(e) {
+    e.preventDefault();
+    
+    const categoryId = document.getElementById('topicCategory').value;
+    const title = document.getElementById('topicTitle').value;
+    const content = tinymce.get('topicContent').getContent();
+    
+    if (!categoryId || !title || !content) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    // // Create FormData object for better handling
+    // const formData = new FormData();
+    // formData.append('action', 'create_topic');
+    // formData.append('category_id', categoryId);
+    // formData.append('title', title);
+    // formData.append('content', content);
+    
+    fetch(API_BASE_URL + '?action=create_topic', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            category_id: categoryId,
+            title: title,
+            content: content
+        }),
+        credentials: 'include'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { throw new Error(err.error || 'Network response was not ok');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        alert(data.message || 'Topic created successfully!');
+        hideCreateTopicModal();
+        loadTopics();
+                
+        // Reset form
+        document.getElementById('topicCategory').value = '';
+        document.getElementById('topicTitle').value = '';
+        tinymce.get('topicContent').setContent('');
+    })
+    .catch(error => {
+        console.error('Error creating topic:', error);
+        alert('Failed to create topic: ' + error.message);
+    });
+}
+
+        function handleReplySubmit() {
+            const content = document.getElementById('replyContent').value;
+            
+            if (!content.trim()) {
+                alert('Please enter reply content');
+                return;
+            }
+            
+            if (!currentTopicId) {
+                alert('No topic selected');
+                return;
+            }
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'create_reply',
+                    topic_id: currentTopicId,
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                document.getElementById('replyContent').value = '';
+                viewTopic(currentTopicId); // Refresh the view
+                loadTopics(); // Update topic list counts
+            })
+            .catch(error => {
+                console.error('Error creating reply:', error);
+                alert('Failed to create reply');
+            });
+        }
+
+        function showReviewReportsModal(e) {
+            e.preventDefault();
+            document.getElementById('reviewReportsModal').style.display = 'flex';
+            loadFlaggedContent();
+        }
+
+        function handleModalOutsideClick(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        }
+
+        function setupAdminTabs() {
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Update tab styles
+                    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    // Update content visibility
+                    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(`${tab.dataset.tab}Content`).classList.add('active');
+                    
+                    // Load content if needed
+                    if (tab.dataset.tab === 'flagged') {
                         loadFlaggedContent();
-                        // Refresh topic view if open
-                        if (document.getElementById('viewTopicTitle').textContent === topic.title) {
-                            viewTopic(topicId);
-                        }
+                    } else if (tab.dataset.tab === 'users') {
+                        loadUserManagement();
+                    } else if (tab.dataset.tab === 'categories') {
+                        loadCategoryManagement();
                     }
-                }
-            }
+                });
+            });
+        }
 
-            // Make functions available globally
-            window.viewTopic = viewTopic;
-            window.editTopic = editTopic;
-            window.editReply = editReply;
-            window.confirmDelete = confirmDelete;
-            window.togglePin = togglePin;
-            window.toggleTopicStatus = toggleTopicStatus;
-            window.showFlagForm = showFlagForm;
-            window.submitFlag = submitFlag;
-            window.loadFlaggedContent = loadFlaggedContent;
-            window.resolveFlag = resolveFlag;
+        function editTopic(topicId) {
+            // In a real implementation, this would open an edit form
+            alert(`Edit functionality for topic ${topicId} would open an edit form`);
+        }
+
+        function editReply(replyId, topicId) {
+            // In a real implementation, this would open an edit form
+            alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
+        }
+
+        function confirmDelete(id, isTopic) {
+            if (!confirm(`Are you sure you want to delete this ${isTopic ? 'topic' : 'reply'}?`)) {
+                return;
+            }
+            
+            const action = isTopic ? 'delete_topic' : 'delete_reply';
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: action,
+                    id: id
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert(`${isTopic ? 'Topic' : 'Reply'} deleted successfully`);
+                
+                if (isTopic) {
+                    loadTopics();
+                    document.getElementById('topicViewModal').style.display = 'none';
+                } else {
+                    viewTopic(currentTopicId); // Refresh the current topic view
+                }
+            })
+            .catch(error => {
+                console.error(`Error deleting ${isTopic ? 'topic' : 'reply'}:`, error);
+                alert(`Failed to delete ${isTopic ? 'topic' : 'reply'}`);
+            });
+        }
+
+        function togglePin(topicId, currentlyPinned) {
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'toggle_pin',
+                    topic_id: topicId,
+                    pinned: !currentlyPinned
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                loadTopics();
+            })
+            .catch(error => {
+                console.error('Error toggling pin status:', error);
+                alert('Failed to update pin status');
+            });
+        }
+
+        function toggleTopicStatus(topicId, isActive) {
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'toggle_active',
+                    topic_id: topicId,
+                    active: isActive
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                loadTopics();
+            })
+            .catch(error => {
+                console.error('Error toggling topic status:', error);
+                alert('Failed to update topic status');
+            });
+        }
+
+        function showFlagForm(replyId) {
+            document.querySelectorAll('.flag-form').forEach(form => form.style.display = 'none');
+            document.getElementById(`flag-form-${replyId}`).style.display = 'block';
+        }
+
+        function submitFlag(replyId, topicId) {
+            const reason = document.getElementById(`flag-reason-${replyId}`).value;
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'flag_reply',
+                    reply_id: replyId,
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert('Thank you for reporting. Moderators will review this content.');
+                document.getElementById(`flag-form-${replyId}`).style.display = 'none';
+                
+                // Refresh flagged content list if admin panel is open
+                if (document.getElementById('reviewReportsModal').style.display === 'flex') {
+                    loadFlaggedContent();
+                }
+            })
+            .catch(error => {
+                console.error('Error flagging reply:', error);
+                alert('Failed to submit report');
+            });
+        }
+
+        function loadFlaggedContent() {
+            fetch(`${API_BASE_URL}?action=get_flagged_content`)
+                .then(response => response.json())
+                .then(flaggedContent => {
+                    const flaggedPostsList = document.getElementById('flaggedPostsList');
+                    flaggedPostsList.innerHTML = '';
+                    
+                    document.getElementById('flag-count').textContent = `(${flaggedContent.length})`;
+                    
+                    if (flaggedContent.length === 0) {
+                        flaggedPostsList.innerHTML = '<p>No flagged content to review.</p>';
+                        return;
+                    }
+                    
+                    flaggedContent.forEach(item => {
+                        const flaggedItem = document.createElement('div');
+                        flaggedItem.className = 'flagged-item';
+                        flaggedItem.innerHTML = `
+                            <p><strong>Topic:</strong> <a href="#" onclick="viewTopic(${item.topic_id}); return false">${item.topic_title}</a></p>
+                            <p><strong>Author:</strong> ${item.author_name} | <strong>Reported for:</strong> ${item.flag_reason || 'No reason provided'}</p>
+                            <div class="flagged-content-preview" style="padding:10px;background:#f9f9f9;margin:5px 0">
+                                ${item.content}
+                            </div>
+                            <div class="admin-actions">
+                                <button class="btn btn-primary" onclick="resolveFlagAdmin(${item.reply_id}, 'keep')">Keep Content</button>
+                                <button class="btn btn-secondary" onclick="resolveFlagAdmin(${item.reply_id}, 'warn')">Warn User</button>
+                                <button class="btn btn-danger" onclick="resolveFlagAdmin(${item.reply_id}, 'delete')">Delete Post</button>
+                            </div>
+                        `;
+                        flaggedPostsList.appendChild(flaggedItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading flagged content:', error);
+                    alert('Failed to load flagged content');
+                });
+        }
+
+        function resolveFlagAdmin(replyId, action) {
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'resolve_flag',
+                    reply_id: replyId,
+                    resolution: action
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert(`Action "${action}" completed successfully`);
+                loadFlaggedContent();
+                
+                // Refresh topic view if open
+                if (document.getElementById('topicViewModal').style.display === 'flex') {
+                    viewTopic(currentTopicId);
+                }
+            })
+            .catch(error => {
+                console.error('Error resolving flag:', error);
+                alert('Failed to complete action');
+            });
+        }
+
+        function loadUserManagement() {
+            // In a real implementation, this would load user management UI
+            document.getElementById('userManagementContent').innerHTML = `
+                <p>User management functionality would be implemented here.</p>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="alert('User management actions would go here')">
+                        Manage Users
+                    </button>
+                </div>
+            `;
+        }
+
+        function loadCategoryManagement() {
+            // In a real implementation, this would load category management UI
+            document.getElementById('categoryManagementContent').innerHTML = `
+                <p>Category management functionality would be implemented here.</p>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="alert('Category management actions would go here')">
+                        Manage Categories
+                    </button>
+                </div>
+            `;
         }
     </script>
 </body>

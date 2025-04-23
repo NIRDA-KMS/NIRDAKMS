@@ -1,7 +1,7 @@
 <?php
 // Start session and include header
 session_start();
-include('../Internees_task/header.php');
+
 
 // Database connection
 $servername = "localhost";
@@ -24,10 +24,10 @@ $users = [];
 $groups = [];
 
 // Check if user is logged in (add your own authentication logic)
-// if (!isset($_SESSION['user_id'])) {
-//     header("Location: login.php");
-//     exit();
-// }
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
 
 // Get users and groups for access control
 // $users_result = $conn->query("SELECT id, username FROM users");
@@ -60,8 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $permission = $conn->real_escape_string($_POST['access']);
     
     // Initialize empty arrays for selections
-    $selected_users = [];
-    $selected_groups = [];
+    $allowed_user_ids = [];
+    $allowed_group_ids = [];
     
     // Process selected users if private access
     if ($permission === 'private' && isset($_POST['userSelect'])) {
@@ -74,30 +74,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valid_users[] = $user_id;
             }
         }
-        $selected_users = $valid_users;
+        $allowed_user_ids = $valid_users;
     }
     
     // Process selected groups if restricted access
     if ($permission === 'restricted' && isset($_POST['groupSelect'])) {
-        $selected_groups = array_map('intval', $_POST['groupSelect']);
+        $allowed_group_ids = array_map('intval', $_POST['groupSelect']);
     }
     
     // Convert arrays to comma-separated strings for database storage
-    $users_str = implode(",", $selected_users);
-    $groups_str = implode(",", $selected_groups);
+    $users_str = implode(",", $allowed_user_ids);
+    $groups_str = implode(",", $allowed_group_ids);
 // }else {
 //         $groups_str = "";
 //     }
 //     if ($permission === 'private' && isset($_POST['userSelect'])) {
-//     $selected_users = validateUserIds($conn, $_POST['userSelect']);
+//     $allowed_user_ids = validateUserIds($conn, $_POST['userSelect']);
 // }
     
     // Insert into database
-    $sql = "INSERT INTO create_forum (category_name, description, permission, selected_users, selected_groups) 
+    $sql = "INSERT INTO forum_categories (category_name, description, permission, allowed_user_ids, allowed_group_ids) 
             VALUES ('$category_name', '$description', '$permission', '$users_str', '$groups_str')";
     
     if ($conn->query($sql)) {
-        $success = "Forum category created successfully!";
+        $success = "Forum category created successfully!"; 
     } else {
         $error = "Error creating forum: " . $conn->error;
     }

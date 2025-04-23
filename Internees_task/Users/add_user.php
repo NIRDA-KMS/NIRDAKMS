@@ -206,8 +206,9 @@
 </head>
 <body>
 <?php 
+require_once '../../SchedureEvent/connect.php'; // Include your database connection file
 $page_title = "Add User";
-include_once("../Internees' task/header.php"); 
+include_once("../../Internees_task/header.php"); 
 ?>
 
 <div class="main-content">
