@@ -1,756 +1,918 @@
+<?php
+include('../SchedureEvent/connect.php');
+
+// Initialize response array
+$response = ['success' => false, 'message' => ''];
+
+// Check if form was submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get POST data
+    $projectName = isset($_POST['projectName']) ? mysqli_real_escape_string($connection, $_POST['projectName']) : '';
+    $projectDescription = isset($_POST['projectDescription']) ? mysqli_real_escape_string($connection, $_POST['projectDescription']) : '';
+    $startDate = isset($_POST['startDate']) ? mysqli_real_escape_string($connection, $_POST['startDate']) : '';
+    $endDate = isset($_POST['endDate']) ? mysqli_real_escape_string($connection, $_POST['endDate']) : '';
+    $notifyTeam = isset($_POST['notifyTeam']) ? 1 : 0;
+    $template = isset($_POST['template']) ? mysqli_real_escape_string($connection, $_POST['template']) : '';
+
+    // Process goals
+    $goals = [];
+    if (isset($_POST['goals']) && is_array($_POST['goals'])) {
+        foreach ($_POST['goals'] as $goal) {
+            if (!empty($goal['title'])) {
+                $goals[] = [
+                    'title' => mysqli_real_escape_string($connection, $goal['title']),
+                    'description' => mysqli_real_escape_string($connection, $goal['description'] ?? '')
+                ];
+            }
+        }
+    }
+
+    // Process members
+    $members = [];
+    if (isset($_POST['members']) && is_array($_POST['members'])) {
+        foreach ($_POST['members'] as $userId => $memberData) {
+            $members[] = [
+                'user_id' => mysqli_real_escape_string($connection, $userId),
+                'role' => mysqli_real_escape_string($connection, $memberData['role'])
+            ];
+        }
+    }
+
+    // Validate required fields
+    if (empty($projectName)) {
+        $response['message'] = 'Project name is required';
+        echo json_encode($response);
+        exit;
+    }
+
+    if (empty($startDate) || empty($endDate)) {
+        $response['message'] = 'Start and end dates are required';
+        echo json_encode($response);
+        exit;
+    }
+
+    if ($startDate > $endDate) {
+        $response['message'] = 'End date must be after start date';
+        echo json_encode($response);
+        exit;
+    }
+
+    if (empty($members)) {
+        $response['message'] = 'At least one team member is required';
+        echo json_encode($response);
+        exit;
+    }
+
+    // Begin transaction
+    mysqli_begin_transaction($connection);
+
+    try {
+        // Insert project into projects table (including first goal)
+        $projectQuery = "INSERT INTO projects (
+                            project_name, 
+                            description, 
+                            project_template,
+                            start_date, 
+                            end_date,
+                            goal_title,
+                            goal_description,
+                            created_at
+                        ) VALUES (
+                            '$projectName',
+                            '$projectDescription',
+                            '$template',
+                            '$startDate',
+                            '$endDate',
+                            '" . (!empty($goals) ? $goals[0]['title'] : '') . "',
+                            '" . (!empty($goals) ? $goals[0]['description'] : '') . "',
+                            NOW()
+                        )";
+        
+        $projectResult = mysqli_query($connection, $projectQuery);
+        
+        if (!$projectResult) {
+            throw new Exception('Failed to create project: ' . mysqli_error($connection));
+        }
+        
+        $projectId = mysqli_insert_id($connection);
+        
+        // Insert team members
+        foreach ($members as $member) {
+            $memberQuery = "INSERT INTO project_members (
+                               project_id, 
+                               user_id, 
+                               role, 
+                               joined_at
+                           ) VALUES (
+                               '$projectId',
+                               '{$member['user_id']}',
+                               '{$member['role']}',
+                               NOW()
+                           )";
+            
+            $memberResult = mysqli_query($connection, $memberQuery);
+            
+            if (!$memberResult) {
+                throw new Exception('Failed to add team member: ' . mysqli_error($connection));
+            }
+        }
+        
+    
+        // Commit transaction
+        mysqli_commit($connection);
+        
+        // Set success response
+        $response['success'] = true;
+        $response['project_id'] = $projectId;
+        $response['message'] = 'Project created successfully';
+        
+        // Send notifications if requested
+        if ($notifyTeam) {
+            // Notification logic would go here
+            // You could email team members or create system notifications
+        }
+        
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        mysqli_rollback($connection);
+        $response['message'] = $e->getMessage();
+    }
+
+    // Return JSON response
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit;
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create New Project</title>
-    <!-- TinyMCE for rich text editor -->
-    <script src="https://cdn.tiny.cloud/1/yy21cxb9sz8dz5s1jswqcenpziyj0y4frg79dtifqqamfxbf/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+    <title>Create New Project | NIRDA Collaboration</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
     <style>
-    /* Updated to match header.css variables */
-    :root {
-        --primary-color: #1a237e;
-        --secondary-color: #2c3e50;
-        --accent-color: #00A0DF;
-        --background-color: #ecf0f1;
-        --text-color: #34495e;
-    }
-
-    body {
-        font-family: 'Roboto', sans-serif;
-        line-height: 1.6;
-        background-color: #f0f2f5;
-        color: #333;
-        padding-top: 110px; /* Adjusted for fixed header (50px) + nav (60px) */
-    }
-
-    .container {
-        width: 1000px;
-        margin-top: 100px;
-        background: white;
-        margin-left: 255px;
+        :root {
+            --primary: #1a237e;
+            --secondary: #2c3e50;
+            --accent: #00A0DF;
+            --background: #f0f2f5;
+            --text: #333333;
+        }
         
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-        margin-bottom: 100px; /* Space for footer */
-    }
-
-    /* Wizard Header - Matched to nav styling */
-    .wizard-header {
-        display: flex;
-        background: #1a237e;
-        padding: 0;
-    }
-
-    .wizard-step {
-        flex: 1;
-        text-align: center;
-        padding: 15px;
-        position: relative;
-        color: rgba(255, 255, 255, 0.8);
-        font-weight: 400;
-        transition: all 0.3s ease;
-    }
-
-    .wizard-step.active {
-        color: white;
-        font-weight: 500;
-        background-color: rgba(0, 160, 223, 0.2);
-    }
-
-    .wizard-step.completed {
-        color: #2ecc71;
-    }
-
-    .wizard-step::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        width: 0;
-        height: 3px;
-        background: var(--accent-color);
-        transition: width 0.3s ease;
-    }
-
-    .wizard-step.active::after {
-        width: 100%;
-        left: 0;
-    }
-
-    /* Wizard Content */
-    .wizard-content {
-        padding: 30px;
-    }
-
-    .step-panel {
-        display: none;
-    }
-
-    .step-panel.active {
-        display: block;
-        animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    /* Form Styles - Matched to header theme */
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: var(--secondary-color);
-    }
-
-    .form-control {
-        width: 100%;
-        padding: 10px 15px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 16px;
-        transition: border-color 0.3s;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .form-control:focus {
-        border-color: var(--accent-color);
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(0, 160, 223, 0.2);
-    }
-
-    textarea.form-control {
-        min-height: 120px;
-        resize: vertical;
-    }
-
-    /* Buttons - Matched to header button styles */
-    .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.3s;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .btn-primary {
-        background: var(--accent-color);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #0088cc;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-secondary {
-        background: var(--background-color);
-        color: var(--secondary-color);
-    }
-
-    .btn-secondary:hover {
-        background: #d5dbdb;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-outline {
-        background: transparent;
-        border: 1px solid var(--accent-color);
-        color: var(--accent-color);
-    }
-
-    .btn-outline:hover {
-        background: rgba(0, 160, 223, 0.1);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    /* Member Selection - Updated colors */
-    .member-selection {
-        display: flex;
-        gap: 20px;
-        margin-top: 20px;
-    }
-
-    .available-members, .selected-members {
-        flex: 1;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px;
-        background: #f9f9f9;
-        min-height: 300px;
-    }
-
-    .member-item:hover {
-        background: rgba(0, 160, 223, 0.1);
-    }
-
-    /* Goals Section */
-    .goal-item:hover {
-        border-color: var(--accent-color);
-    }
-
-    /* Templates */
-    .template-card:hover {
-        border-color: var(--accent-color);
-    }
-
-    .template-card.selected {
-        border: 2px solid var(--accent-color);
-        background: rgba(0, 160, 223, 0.1);
-    }
-
-    /* Review Section */
-    .review-section {
-        margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .review-section h3 {
-        color: var(--primary-color);
-        margin-bottom: 15px;
-        padding-bottom: 5px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .review-item {
-        margin-bottom: 10px;
-    }
-
-    .review-text {
-        background: #f9f9f9;
-        padding: 10px;
-        border-radius: 4px;
-        border-left: 3px solid var(--accent-color);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
         body {
-            padding-top: 135px; /* Adjusted for mobile header height */
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
         }
         
         .container {
-           margin-top: 200px;
-            padding-top: 100px;
-            border-radius: 0;
+            max-width: 1000px;
+            margin-bottom: 50px;
+            margin-right: 30px;
+            margin-top: 100px;
+            margin-left: 255px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding-left: 30px;
         }
         
-        .wizard-content {
-            padding: 15px;
+        h1 {
+            color: var(--primary);
+            margin-top: 0;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
         }
         
-        .member-selection {
-            flex-direction: column;
-        }
-        
-        .date-picker-group {
-            flex-direction: column;
-            gap: 10px;
+        .wizard-progress {
+            display: flex;
+            margin-bottom: 30px;
         }
         
         .wizard-step {
-            font-size: 14px;
-            padding: 10px 5px;
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        
+        .wizard-step .step-number {
+            width: 30px;
+            height: 30px;
+            background-color: #ddd;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+            color: var(--text);
+        }
+        
+        .wizard-step.active .step-number {
+            background-color: var(--accent);
+            color: white;
+        }
+        
+        .wizard-step.completed .step-number {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .wizard-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            right: -50%;
+            height: 2px;
+            background-color: #ddd;
+            z-index: -1;
+        }
+        
+        .wizard-step.completed:not(:last-child)::after {
+            background-color: var(--primary);
+        }
+        
+        .wizard-content {
+            display: none;
+        }
+        
+        .wizard-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        input[type="date"],
+        textarea,
+        select {
+    width: 90%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Roboto', sans-serif;
+    background-color: white;
+    appearance: none; /* Removes default system styling */
+    -webkit-appearance: none; /* For Safari */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 1em;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,160,223,0.2);
+}
+        
+        textarea {
+            min-height: 100px;
         }
         
         .btn {
-            padding: 8px 15px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s;
         }
-    }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0f1769;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #1e2b37;
+        }
+        
+        .btn-accent {
+            background-color: var(--accent);
+            color: white;
+        }
+        
+        .btn-accent:hover {
+            background-color: #0088c6;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--secondary);
+            color: var(--secondary);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--secondary);
+            color: white;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        
+        .member-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 150px;
+        }
+        
+        .member-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background-color: var(--background);
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        
+        .member-item:hover {
+            background-color: #e0e5eb;
+        }
+        
+        .member-role {
+    margin-left: auto;
+    width: 150px;
+    padding: 8px; /* Slightly less padding than main selects */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Roboto', sans-serif;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 1em;
+}
+        
+        .goal-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: var(--background);
+            border-radius: 4px;
+        }
+        
+        .goal-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .template-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .template-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(0,160,223,0.2);
+        }
+        
+        .template-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+        
+        .drag-handle {
+            cursor: move;
+            margin-right: 10px;
+            color: var(--secondary);
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .search-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap; /* Allows items to wrap on small screens */
+}
 
-    @media (max-width: 480px) {
-        body {
-            padding-top: 160px; /* Extra space for mobile navigation */
-        }
-    }
-</style>
+.search-input, .member-role {
+    flex: 1;
+    min-width: 150px; /* Prevents them from becoming too small */
+}
+
+#addMemberBtn {
+    white-space: nowrap; /* Prevents button text from wrapping */
+}
+    </style>
 </head>
 <body>
-<?php include("../Internees_task/header.php"); ?>
+    <?php include('../Internees_task/header.php'); ?>
     <div class="container">
-        <!-- Wizard Header -->
-        <div class="wizard-header">
-            <div class="wizard-step active" data-step="1">
-                <span>1. Basic Info</span>
+        <h1><i class="fas fa-project-diagram"></i> Create New Collaborative Project</h1>
+        
+        <!-- Wizard Progress -->
+        <div class="wizard-progress">
+            <div class="wizard-step active" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-title">Basic Info</div>
             </div>
-            <div class="wizard-step" data-step="2">
-                <span>2. Team Setup</span>
+            <div class="wizard-step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-title">Team Setup</div>
             </div>
-            <div class="wizard-step" data-step="3">
-                <span>3. Goals</span>
+            <div class="wizard-step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-title">Goals</div>
             </div>
-            <div class="wizard-step" data-step="4">
-                <span>4. Review</span>
+            <div class="wizard-step" id="step4">
+                <div class="step-number">4</div>
+                <div class="step-title">Review</div>
             </div>
         </div>
         
         <!-- Wizard Content -->
-        <div class="wizard-content">
+        <form id="projectForm" method="POST" action="">
             <!-- Step 1: Basic Info -->
-            <div class="step-panel active" id="step1">
-                <h2>Project Information</h2>
-                <p class="subtitle">Enter basic details about your project</p>
-                
+            <div class="wizard-content active" id="content1">
                 <div class="form-group">
-                    <label for="projectName">Project Name</label>
-                    <input type="text" id="projectName" class="form-control" placeholder="e.g. Website Redesign Project">
+                    <label for="projectName">Project Name <span class="required">*</span></label>
+                    <input type="text" id="projectName" name="projectName" required>
+                    <div class="error-message" id="nameError"></div>
                 </div>
                 
                 <div class="form-group">
                     <label for="projectDescription">Description</label>
-                    <textarea id="projectDescription" class="form-control" placeholder="Describe your project in detail..."></textarea>
+                    <textarea id="projectDescription" name="projectDescription"></textarea>
                 </div>
                 
-                <div class="form-group">
-                    <label>Project Timeline</label>
-                    <div class="date-picker-group">
-                        <div class="date-picker">
-                            <label for="startDate">Start Date</label>
-                            <input type="date" id="startDate" class="form-control">
-                        </div>
-                        <div class="date-picker">
-                            <label for="endDate">End Date</label>
-                            <input type="date" id="endDate" class="form-control">
-                        </div>
+                <div class="form-row" style="display: flex; gap: 20px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="startDate">Start Date <span class="required">*</span></label>
+                        <input type="date" id="startDate" name="startDate" required>
+                        <div class="error-message" id="startDateError"></div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="endDate">End Date <span class="required">*</span></label>
+                        <input type="date" id="endDate" name="endDate" required>
+                        <div class="error-message" id="endDateError"></div>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label>Project Template (Optional)</label>
-                    <div class="template-options">
-                        <div class="template-card" data-template="web-dev">
-                            <h4>Web Development</h4>
-                            <p>Standard phases for website projects</p>
-                        </div>
-                        <div class="template-card" data-template="marketing">
-                            <h4>Marketing Campaign</h4>
-                            <p>Template for marketing initiatives</p>
-                        </div>
-                        <div class="template-card" data-template="product">
-                            <h4>Product Launch</h4>
-                            <p>Product development workflow</p>
-                        </div>
-                        <div class="template-card" data-template="research">
-                            <h4>Research Project</h4>
-                            <p>Academic research framework</p>
-                        </div>
+                    <div class="template-card">
+                        <h3><i class="fas fa-file-alt"></i> Standard Project</h3>
+                        <p>A blank project with basic structure</p>
+                        <button type="button" class="btn btn-outline" onclick="selectTemplate(this, 'Standard Project')">Select</button>
                     </div>
-                </div>
-                
-                <div class="wizard-actions">
-                    <div></div> <!-- Empty div for spacing -->
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Team Setup</button>
+                    <div class="template-card">
+                        <h3><i class="fas fa-users"></i> Team Collaboration</h3>
+                        <p>Pre-configured with multiple roles and standard goals</p>
+                        <button type="button" class="btn btn-outline" onclick="selectTemplate(this, 'Team Collaboration')">Select</button>
+                    </div>
+                    <div class="template-card">
+                        <h3><i class="fas fa-chart-line"></i> Research Project</h3>
+                        <p>Includes research milestones and reporting structure</p>
+                        <button type="button" class="btn btn-outline" onclick="selectTemplate(this, 'Research Project')">Select</button>
+                    </div>
+                    <input type="hidden" id="template" name="template" value="">
                 </div>
             </div>
             
             <!-- Step 2: Team Setup -->
-            <div class="step-panel" id="step2">
-                <h2>Team Members</h2>
-                <p class="subtitle">Add collaborators and assign roles</p>
-                
-                <div class="member-selection">
-                    <div class="available-members">
-                        <h3>Available Members</h3>
-                        <ul class="member-list" id="availableMembers">
-                            <li class="member-item" draggable="true" data-id="1">
-                                <span>John Smith</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="2">
-                                <span>Sarah Johnson</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="3">
-                                <span>Michael Brown</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="4">
-                                <span>Emily Davis</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                            <li class="member-item" draggable="true" data-id="5">
-                                <span>David Wilson</span>
-                                <span class="member-role">Not assigned</span>
-                            </li>
-                        </ul>
+            <div class="wizard-content" id="content2">
+                <div class="form-group">
+                    <label>Add Team Members</label>
+                    <div class="search-container">
+                        <select id="userSelect" class="search-input">
+                            <option value="">-- Select a User --</option>
+                            <?php
+                            $usersQuery = "SELECT user_id, full_name FROM users ORDER BY full_name";
+                            $usersResult = mysqli_query($connection, $usersQuery);
+                            
+                            if ($usersResult && mysqli_num_rows($usersResult) > 0) {
+                                while ($user = mysqli_fetch_assoc($usersResult)) {
+                                    echo '<option value="' . htmlspecialchars($user['user_id']) . '">' . 
+                                         htmlspecialchars($user['full_name']) . '</option>';
+                                }
+                            } else {
+                                echo '<option value="">No users available</option>';
+                            }
+                            ?>
+                        </select>
+                        <select id="roleSelect" class="member-role">
+    <!-- Leadership & Management -->
+    <option value="executive_director">Executive Director</option>
+    <option value="deputy_director">Deputy Director</option>
+    <option value="department_head">Department Head</option>
+    <option value="division_chief">Division Chief</option>
+    <option value="program_manager">Program Manager</option>
+    <option value="project_manager">Project Manager</option>
+    <option value="team_lead">Team Lead</option>
+    <option value="unit_supervisor">Unit Supervisor</option>
+    <option value="regional_coordinator">Regional Coordinator</option>
+    <option value="strategic_advisor">Strategic Advisor</option>
+    <option value="governance_officer">Governance Officer</option>
+    <option value="operations_manager">Operations Manager</option>
+    
+    <!-- Technical & Research -->
+    <option value="chief_scientist">Chief Scientist</option>
+    <option value="senior_researcher">Senior Researcher</option>
+    <option value="research_fellow">Research Fellow</option>
+    <option value="data_scientist">Data Scientist</option>
+    <option value="statistician">Statistician</option>
+    <option value="technical_advisor">Technical Advisor</option>
+    <option value="innovation_specialist">Innovation Specialist</option>
+    <option value="lab_manager">Lab Manager</option>
+    <option value="field_researcher">Field Researcher</option>
+    <option value="evaluation_specialist">Evaluation Specialist</option>
+    <option value="technology_architect">Technology Architect</option>
+    <option value="systems_analyst">Systems Analyst</option>
+    <option value="ai_specialist">AI Specialist</option>
+    <option value="gis_specialist">GIS Specialist</option>
+    <option value="technical_writer">Technical Writer</option>
+    
+    <!-- Administration & Support -->
+    <option value="admin_officer">Admin Officer</option>
+    <option value="hr_manager">HR Manager</option>
+    <option value="finance_officer">Finance Officer</option>
+    <option value="procurement_specialist">Procurement Specialist</option>
+    <option value="logistics_coordinator">Logistics Coordinator</option>
+    <option value="facilities_manager">Facilities Manager</option>
+    <option value="executive_assistant">Executive Assistant</option>
+    <option value="records_manager">Records Manager</option>
+    <option value="legal_advisor">Legal Advisor</option>
+    <option value="compliance_officer">Compliance Officer</option>
+    <option value="internal_auditor">Internal Auditor</option>
+    <option value="security_officer">Security Officer</option>
+    
+    <!-- Knowledge Management -->
+    <option value="km_strategist">KM Strategist</option>
+    <option value="knowledge_curator">Knowledge Curator</option>
+    <option value="information_specialist">Information Specialist</option>
+    <option value="content_manager">Content Manager</option>
+    <option value="documentation_specialist">Documentation Specialist</option>
+    <option value="taxonomy_expert">Taxonomy Expert</option>
+    <option value="metadata_specialist">Metadata Specialist</option>
+    <option value="community_manager">Community Manager</option>
+    <option value="learning_developer">Learning Developer</option>
+    <option value="knowledge_analyst">Knowledge Analyst</option>
+    
+    <!-- ICT & Digital -->
+    <option value="cio">Chief Information Officer</option>
+    <option value="systems_admin">Systems Administrator</option>
+    <option value="database_admin">Database Administrator</option>
+    <option value="network_engineer">Network Engineer</option>
+    <option value="software_developer">Software Developer</option>
+    <option value="webmaster">Webmaster</option>
+    <option value="cybersecurity_specialist">Cybersecurity Specialist</option>
+    <option value="digital_transformation_lead">Digital Transformation Lead</option>
+    
+    <!-- Communication & Outreach -->
+    <option value="communications_director">Communications Director</option>
+    <option value="public_relations_officer">Public Relations Officer</option>
+    <option value="media_specialist">Media Specialist</option>
+    <option value="graphic_designer">Graphic Designer</option>
+    <option value="multimedia_producer">Multimedia Producer</option>
+    
+    <!-- Default selected -->
+    <option value="contributor" selected>Contributor</option>
+</select>
+                        <button type="button" class="btn btn-accent" id="addMemberBtn"><i class="fas fa-plus"></i> Add</button>
                     </div>
-                    
-                    <div class="selected-members">
-                        <h3>Project Team</h3>
-                        <div class="role-tabs">
-                            <button class="role-tab active" data-role="manager">Managers</button>
-                            <button class="role-tab" data-role="contributor">Contributors</button>
-                            <button class="role-tab" data-role="viewer">Viewers</button>
-                        </div>
-                        <ul class="member-list" id="projectTeam">
-                            <!-- Members will be added here via drag and drop -->
-                        </ul>
-                    </div>
+                    <div class="error-message" id="memberError"></div>
                 </div>
                 
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Goals</button>
+                <div class="form-group">
+                    <label>Project Members</label>
+                    <div class="member-list" id="memberList">
+                        <!-- Members will be added here dynamically -->
+                    </div>
                 </div>
             </div>
             
             <!-- Step 3: Goals -->
-            <div class="step-panel" id="step3">
-                <h2>Project Goals</h2>
-                <p class="subtitle">Define your project objectives and milestones</p>
-                
-                <div id="goalsContainer">
-                    <div class="goal-item">
-                        <button class="remove-goal" onclick="removeGoal(this)">×</button>
-                        <div class="form-group">
-                            <label>Goal Title</label>
-                            <input type="text" class="form-control" placeholder="e.g. Complete homepage design">
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea class="form-control" placeholder="Describe this goal in detail..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Target Date</label>
-                            <input type="date" class="form-control">
+            <div class="wizard-content" id="content3">
+                <div class="form-group">
+                    <label>Project Goals and Objectives</label>
+                    <div id="goalsContainer">
+                        <div class="goal-item">
+                            <div class="goal-header">
+                                <input type="text" name="goals[0][title]" placeholder="Goal title" required style="flex: 1; margin-right: 10px;">
+                            </div>
+                            <textarea name="goals[0][description]" placeholder="Goal description"></textarea>
                         </div>
                     </div>
-                </div>
-                
-                <button class="btn btn-outline" onclick="addGoal()">+ Add Another Goal</button>
-                
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="nextStep()">Next: Review</button>
+                    <button type="button" class="btn btn-accent" id="addGoal"><i class="fas fa-plus"></i> Add Goal</button>
                 </div>
             </div>
             
             <!-- Step 4: Review -->
-            <div class="step-panel" id="step4">
-                <h2>Review Project</h2>
-                <p class="subtitle">Verify all details before creating your project</p>
-                
-                <div class="review-section">
-                    <h3>Project Information</h3>
-                    <div class="review-item">
-                        <strong>Project Name:</strong>
-                        <span id="reviewName">Not specified</span>
-                    </div>
-                    <div class="review-item">
-                        <strong>Description:</strong>
-                        <div id="reviewDescription" class="review-text">Not specified</div>
-                    </div>
-                    <div class="review-item">
-                        <strong>Timeline:</strong>
-                        <span id="reviewTimeline">Not specified</span>
-                    </div>
-                </div>
-                
-                <div class="review-section">
-                    <h3>Project Team</h3>
-                    <div id="reviewTeam">
-                        <p>No team members added yet</p>
+            <div class="wizard-content" id="content4">
+                <div class="form-group">
+                    <h3 style="color: var(--primary);">Project Summary</h3>
+                    <div style="background-color: var(--background); padding: 20px; border-radius: 4px;">
+                        <h4 id="reviewProjectName">Project Name: </h4>
+                        <p id="reviewProjectDescription">Description: </p>
+                        <p id="reviewProjectDates">Dates: </p>
+                        <p id="reviewProjectTemplate">Template: </p>
+                        
+                        <h4 style="margin-top: 20px;">Team Members</h4>
+                        <ul id="reviewMembers" style="list-style-type: none; padding-left: 0;">
+                            <!-- Team members will be listed here -->
+                        </ul>
+                        
+                        <h4 style="margin-top: 20px;">Project Goals</h4>
+                        <ul id="reviewGoals" style="list-style-type: none; padding-left: 0;">
+                            <!-- Goals will be listed here -->
+                        </ul>
                     </div>
                 </div>
                 
-                <div class="review-section">
-                    <h3>Project Goals</h3>
-                    <div id="reviewGoals">
-                        <p>No goals defined yet</p>
-                    </div>
-                </div>
-                
-                <div class="wizard-actions">
-                    <button class="btn btn-secondary" onclick="prevStep()">Back</button>
-                    <button class="btn btn-primary" onclick="submitProject()">Create Project</button>
+                <div class="form-group">
+                    <label for="notifyTeam">Notify team members about this project?</label>
+                    <input type="checkbox" id="notifyTeam" name="notifyTeam" checked>
                 </div>
             </div>
-        </div>
+            
+            <!-- Navigation Buttons -->
+            <div class="action-buttons">
+                <button type="button" class="btn btn-secondary" id="prevBtn" disabled><i class="fas fa-arrow-left"></i> Previous</button>
+                <button type="button" class="btn btn-primary" id="nextBtn">Next <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </form>
     </div>
 
     <script>
-        // Initialize TinyMCE for rich text editor
-        tinymce.init({
-            selector: '#projectDescription',
-            plugins: 'lists link',
-            toolbar: 'bold italic | bullist numlist | link',
-            menubar: false,
-            height: 200
-        });
-        
-        // Wizard Navigation
-        let currentStep = 1;
-        
-        function nextStep() {
-            if (validateCurrentStep()) {
+    // Wizard Navigation
+    let currentStep = 1;
+    const totalSteps = 4;
+    
+    document.getElementById('nextBtn').addEventListener('click', function() {
+        if (validateStep(currentStep)) {
+            if (currentStep < totalSteps) {
+                document.getElementById(`content${currentStep}`).classList.remove('active');
                 document.getElementById(`step${currentStep}`).classList.remove('active');
-                document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.remove('active');
                 
                 currentStep++;
                 
+                document.getElementById(`content${currentStep}`).classList.add('active');
                 document.getElementById(`step${currentStep}`).classList.add('active');
-                document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.add('active');
                 
-                if (currentStep === 4) {
+                document.getElementById('prevBtn').disabled = false;
+                
+                if (currentStep === totalSteps) {
                     updateReviewSection();
-                }
-            }
-        }
-        
-        function prevStep() {
-            document.getElementById(`step${currentStep}`).classList.remove('active');
-            document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.remove('active');
-            
-            currentStep--;
-            
-            document.getElementById(`step${currentStep}`).classList.add('active');
-            document.querySelector(`.wizard-step[data-step="${currentStep}"]`).classList.add('active');
-        }
-        
-        function validateCurrentStep() {
-            if (currentStep === 1) {
-                const projectName = document.getElementById('projectName').value.trim();
-                if (!projectName) {
-                    alert('Please enter a project name');
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        // Template Selection
-        document.querySelectorAll('.template-card').forEach(card => {
-            card.addEventListener('click', function() {
-                document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-                this.classList.add('selected');
-            });
-        });
-        
-        // Drag and Drop for Team Members
-        let draggedItem = null;
-        
-        document.querySelectorAll('.member-item').forEach(item => {
-            item.addEventListener('dragstart', function() {
-                draggedItem = this;
-                setTimeout(() => this.classList.add('dragging'), 0);
-            });
-            
-            item.addEventListener('dragend', function() {
-                this.classList.remove('dragging');
-            });
-        });
-        
-        document.querySelectorAll('.member-list').forEach(list => {
-            list.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                const afterElement = getDragAfterElement(this, e.clientY);
-                if (afterElement == null) {
-                    this.appendChild(draggedItem);
+                    this.textContent = 'Create Project';
                 } else {
-                    this.insertBefore(draggedItem, afterElement);
+                    this.textContent = 'Next';
                 }
-            });
-        });
-        
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.member-item:not(.dragging)')];
-            
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-        
-        // Role Assignment
-        document.querySelectorAll('.role-tab').forEach(tab => {
-            tab.addEventListener('click', function() {
-                document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-                
-                const role = this.dataset.role;
-                if (draggedItem) {
-                    const roleSpan = draggedItem.querySelector('.member-role');
-                    roleSpan.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-                    roleSpan.style.background = getRoleColor(role);
-                }
-            });
-        });
-        
-        function getRoleColor(role) {
-            const colors = {
-                manager: '#3498db',
-                contributor: '#2ecc71',
-                viewer: '#95a5a6'
-            };
-            return colors[role] || '#eee';
-        }
-        
-        // Goals Management
-        function addGoal() {
-            const goalsContainer = document.getElementById('goalsContainer');
-            const goalId = Date.now();
-            
-            const goalHtml = `
-                <div class="goal-item">
-                    <button class="remove-goal" onclick="removeGoal(this)">×</button>
-                    <div class="form-group">
-                        <label>Goal Title</label>
-                        <input type="text" class="form-control" placeholder="e.g. Complete homepage design">
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea class="form-control" placeholder="Describe this goal in detail..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Target Date</label>
-                        <input type="date" class="form-control">
-                    </div>
-                </div>
-            `;
-            
-            goalsContainer.insertAdjacentHTML('beforeend', goalHtml);
-        }
-        
-        function removeGoal(button) {
-            if (document.querySelectorAll('.goal-item').length > 1) {
-                button.closest('.goal-item').remove();
             } else {
-                alert('A project must have at least one goal');
+                // Submit form
+                document.getElementById('projectForm').submit();
             }
         }
+    });
+    
+    document.getElementById('prevBtn').addEventListener('click', function() {
+        document.getElementById(`content${currentStep}`).classList.remove('active');
+        document.getElementById(`step${currentStep}`).classList.remove('active');
         
-        // Review Section Update
-        function updateReviewSection() {
-            // Project Info
-            document.getElementById('reviewName').textContent = 
-                document.getElementById('projectName').value || 'Not specified';
-            
-            document.getElementById('reviewDescription').innerHTML = 
-                tinymce.get('projectDescription').getContent() || 'Not specified';
-            
+        currentStep--;
+        
+        document.getElementById(`content${currentStep}`).classList.add('active');
+        document.getElementById(`step${currentStep}`).classList.add('active');
+        
+        document.getElementById('nextBtn').textContent = 'Next';
+        
+        if (currentStep === 1) {
+            this.disabled = true;
+        }
+    });
+    
+    // Add Member Button with role handling
+    document.getElementById('addMemberBtn').addEventListener('click', function() {
+        const userSelect = document.getElementById('userSelect');
+        const roleSelect = document.getElementById('roleSelect');
+        const userId = userSelect.value;
+        const userName = userSelect.options[userSelect.selectedIndex].text;
+        const role = roleSelect.value;
+        const roleName = roleSelect.options[roleSelect.selectedIndex].text;
+        
+        if (!userId) {
+            alert('Please select a user');
+            return;
+        }
+        
+        // Check if user already exists
+        if (document.querySelector(`.member-item[data-user-id="${userId}"]`)) {
+            alert('This user is already a team member');
+            return;
+        }
+        
+        // Create new member item
+        const memberItem = document.createElement('div');
+        memberItem.className = 'member-item';
+        memberItem.dataset.userId = userId;
+        
+        // Clone the role select dropdown for this member
+        const roleSelectClone = roleSelect.cloneNode(true);
+        roleSelectClone.value = role;
+        roleSelectClone.className = 'member-role';
+        roleSelectClone.style.width = '150px';
+        
+        memberItem.innerHTML = `
+            <i class="fas fa-grip-vertical drag-handle"></i>
+            <span>${userName}</span>
+            <input type="hidden" name="members[${userId}][user_id]" value="${userId}">
+            <input type="hidden" name="members[${userId}][name]" value="${userName}">
+            <input type="hidden" name="members[${userId}][role]" value="${role}">
+            <input type="hidden" name="members[${userId}][role_name]" value="${roleName}">
+            <button type="button" class="btn btn-outline" style="margin-left: 10px;">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        // Insert the cloned select before the button
+        memberItem.insertBefore(roleSelectClone, memberItem.querySelector('button'));
+        
+        // Add remove functionality
+        memberItem.querySelector('button').addEventListener('click', function() {
+            memberItem.remove();
+        });
+        
+        // Add role change handler
+        roleSelectClone.addEventListener('change', function() {
+            memberItem.querySelector('input[name$="[role]"]').value = this.value;
+            memberItem.querySelector('input[name$="[role_name]"]').value = 
+                this.options[this.selectedIndex].text;
+        });
+        
+        document.getElementById('memberList').appendChild(memberItem);
+        userSelect.selectedIndex = 0;
+        roleSelect.value = 'contributor'; // Reset to default
+    });
+    
+    // Add Goal Button
+    document.getElementById('addGoal').addEventListener('click', function() {
+        const goalCount = document.querySelectorAll('.goal-item').length;
+        const goalItem = document.createElement('div');
+        goalItem.className = 'goal-item';
+        goalItem.innerHTML = `
+            <div class="goal-header">
+                <input type="text" name="goals[${goalCount}][title]" placeholder="Goal title" required style="flex: 1; margin-right: 10px;">
+                <button type="button" class="btn btn-outline"><i class="fas fa-times"></i> Remove</button>
+            </div>
+            <textarea name="goals[${goalCount}][description]" placeholder="Goal description"></textarea>
+        `;
+        
+        goalItem.querySelector('button').addEventListener('click', function() {
+            goalItem.remove();
+        });
+        
+        document.getElementById('goalsContainer').appendChild(goalItem);
+    });
+    
+    // Form Validation
+    function validateStep(step) {
+        let isValid = true;
+        
+        if (step === 1) {
+            const projectName = document.getElementById('projectName').value.trim();
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
-            document.getElementById('reviewTimeline').textContent = 
-                startDate && endDate ? `${formatDate(startDate)} to ${formatDate(endDate)}` : 'Not specified';
             
-            // Team Members
-            const teamMembers = document.getElementById('projectTeam').children;
-            if (teamMembers.length > 0) {
-                let teamHtml = '<ul>';
-                Array.from(teamMembers).forEach(member => {
-                    const name = member.querySelector('span:first-child').textContent;
-                    const role = member.querySelector('.member-role').textContent;
-                    teamHtml += `<li><strong>${name}</strong> (${role})</li>`;
-                });
-                teamHtml += '</ul>';
-                document.getElementById('reviewTeam').innerHTML = teamHtml;
+            if (projectName === '') {
+                document.getElementById('nameError').textContent = 'Project name is required';
+                isValid = false;
+            } else {
+                document.getElementById('nameError').textContent = '';
             }
             
-            // Goals
-            const goals = document.querySelectorAll('.goal-item');
-            if (goals.length > 0) {
-                let goalsHtml = '<ul>';
-                goals.forEach(goal => {
-                    const title = goal.querySelector('input[type="text"]').value || 'Untitled goal';
-                    const description = goal.querySelector('textarea').value || 'No description';
-                    const date = goal.querySelector('input[type="date"]').value;
-                    
-                    goalsHtml += `
-                        <li>
-                            <strong>${title}</strong>
-                            <p>${description}</p>
-                            ${date ? `<small>Target: ${formatDate(date)}</small>` : ''}
-                        </li>
-                    `;
-                });
-                goalsHtml += '</ul>';
-                document.getElementById('reviewGoals').innerHTML = goalsHtml;
+            if (startDate === '') {
+                document.getElementById('startDateError').textContent = 'Start date is required';
+                isValid = false;
+            } else {
+                document.getElementById('startDateError').textContent = '';
+            }
+            
+            if (endDate === '') {
+                document.getElementById('endDateError').textContent = 'End date is required';
+                isValid = false;
+            } else if (startDate !== '' && endDate < startDate) {
+                document.getElementById('endDateError').textContent = 'End date must be after start date';
+                isValid = false;
+            } else {
+                document.getElementById('endDateError').textContent = '';
+            }
+        } else if (step === 2) {
+            const memberCount = document.querySelectorAll('.member-item').length;
+            if (memberCount === 0) {
+                document.getElementById('memberError').textContent = 'At least one team member is required';
+                isValid = false;
+            } else {
+                document.getElementById('memberError').textContent = '';
+            }
+        } else if (step === 3) {
+            // Validate goals
+            const goalInputs = document.querySelectorAll('input[name^="goals["][name$="][title]"]');
+            let hasEmptyGoal = false;
+            
+            goalInputs.forEach(input => {
+                if (input.value.trim() === '') {
+                    hasEmptyGoal = true;
+                    input.style.borderColor = '#e74c3c';
+                } else {
+                    input.style.borderColor = '#ddd';
+                }
+            });
+            
+            if (hasEmptyGoal) {
+                alert('Please fill in all goal titles');
+                isValid = false;
             }
         }
         
-        function formatDate(dateString) {
-            if (!dateString) return '';
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(dateString).toLocaleDateString('en-US', options);
-        }
+        return isValid;
+    }
+    
+    // Update Review Section with role names
+    function updateReviewSection() {
+        // Basic project info
+        document.getElementById('reviewProjectName').textContent = 'Project Name: ' + document.getElementById('projectName').value;
+        document.getElementById('reviewProjectDescription').textContent = 'Description: ' + (document.getElementById('projectDescription').value || 'None provided');
+        document.getElementById('reviewProjectDates').textContent = 'Dates: ' + document.getElementById('startDate').value + ' to ' + document.getElementById('endDate').value;
+        document.getElementById('reviewProjectTemplate').textContent = 'Template: ' + (document.getElementById('template').value || 'None selected');
         
-        // Form Submission
-        function submitProject() {
-            // Collect all form data
-            const projectData = {
-                name: document.getElementById('projectName').value,
-                description: tinymce.get('projectDescription').getContent(),
-                startDate: document.getElementById('startDate').value,
-                endDate: document.getElementById('endDate').value,
-                template: document.querySelector('.template-card.selected')?.dataset.template,
-                members: [],
-                goals: []
-            };
+        // Team members
+        const reviewMembersList = document.getElementById('reviewMembers');
+        reviewMembersList.innerHTML = '';
+        
+        const memberItems = document.querySelectorAll('.member-item');
+        memberItems.forEach(member => {
+            const userName = member.querySelector('span').textContent;
+            const roleName = member.querySelector('input[name$="[role_name]"]').value;
             
-            // Get team members
-            const teamMembers = document.getElementById('projectTeam').children;
-            Array.from(teamMembers).forEach(member => {
-                projectData.members.push({
-                    id: member.dataset.id,
-                    name: member.querySelector('span:first-child').textContent,
-                    role: member.querySelector('.member-role').textContent.toLowerCase()
-                });
-            });
-            
-            // Get goals
-            const goals = document.querySelectorAll('.goal-item');
-            goals.forEach(goal => {
-                projectData.goals.push({
-                    title: goal.querySelector('input[type="text"]').value,
-                    description: goal.querySelector('textarea').value,
-                    targetDate: goal.querySelector('input[type="date"]').value
-                });
-            });
-            
-            console.log('Project data to submit:', projectData);
-            
-            // In a real app, you would use AJAX to submit the data
-            /*
-            fetch('/api/projects', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(projectData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert('Project created successfully!');
-                window.location.href = `/projects/${data.id}`;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('There was an error creating the project');
-            });
-            */
-            
-            // For demo purposes, just show an alert
-            alert('Project creation functionality would submit to your backend API\nCheck console for collected data');
-        }
-    </script>
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `<i class="fas fa-user-tie"></i> ${userName} (${roleName})`;
+            reviewMembersList.appendChild(listItem);
+        });
+        
+        // Goals
+        const reviewGoalsList = document.getElementById('reviewGoals');
+        reviewGoalsList.innerHTML = '';
+        
+        const goalInputs = document.querySelectorAll('input[name^="goals["][name$="][title]"]');
+        goalInputs.forEach(input => {
+            const title = input.value;
+            if (title) {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `<i class="fas fa-check-circle"></i> ${title}`;
+                reviewGoalsList.appendChild(listItem);
+            }
+        });
+    }
+    
+    // Template selection
+    function selectTemplate(button, templateName) {
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.style.borderColor = '#ddd';
+            card.querySelector('button').className = 'btn btn-outline';
+            card.querySelector('button').textContent = 'Select';
+        });
+        
+        button.closest('.template-card').style.borderColor = 'var(--accent)';
+        button.className = 'btn btn-accent';
+        button.textContent = 'Selected';
+        document.getElementById('template').value = templateName;
+    }
+</script>
 </body>
 </html>
