@@ -2,22 +2,18 @@
 include 'connect.php';
 
 // SQL to create forum_topics table
-$sql = "CREATE TABLE `forum_replies` (
-  `reply_id` int(11) NOT NULL,
-  `topic_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `content` text NOT NULL,
-  `is_flagged` tinyint(1) DEFAULT 0,
-  `flag_reason` varchar(255) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-";
-
-
+$sql ="CREATE TABLE project_goals (
+    goal_id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    INDEX (project_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 // Execute query
 if (mysqli_query($connection, $sql)) {
-    echo "Table schedule_events created successfully";
+    echo "Table project_goals created successfully";
 } else {
     echo "Error creating table: " . mysqli_error($connection);
 }
