@@ -739,47 +739,52 @@ $(document).ready(function() {
         text: 'Are you sure you want to send reminders for this event?',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, send it!',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: 'Yes, send reminders',
+        cancelButtonText: 'Cancel',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return fetch('send_reminders.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `event_id=${eventId}`
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .catch(error => {
+                Swal.showValidationMessage(
+                    `Request failed: ${error}`
+                );
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire({
-                title: 'Sending...',
-                text: 'Please wait while reminders are being sent.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
+            if (result.value.success) {
+                let message = result.value.message;
+                if (result.value.failed && result.value.failed.length > 0) {
+                    message += '<br><br>Failed emails:<br>' + result.value.failed.join('<br>');
                 }
-            });
-
-            $.ajax({
-                url: 'send_reminders.php',
-                type: 'POST',
-                data: { event_id: eventId },
-                success: function(response) {
-                    Swal.close(); // Close the loading spinner
-                    try {
-                        const res = JSON.parse(response);
-                        if (res.success) {
-                            Swal.fire('Success', res.message, 'success');
-                        } else {
-                            Swal.fire('Error', res.message, 'error');
-                        }
-                    } catch (e) {
-                        Swal.fire('Error', 'Invalid response from server.', 'error');
-                    }
-                },
-                error: function() {
-                    Swal.close(); // Close the loading spinner
-                    Swal.fire('Error', 'An error occurred while sending reminders.', 'error');
-                }
-            });
+                Swal.fire({
+                    title: 'Success',
+                    html: message,
+                    icon: 'success'
+                });
+            } else {
+                Swal.fire({
+                    title: 'Error',
+                    text: result.value.message,
+                    icon: 'error'
+                });
+            }
         }
     });
 });
-
-
-
 
 </script>
 </body>

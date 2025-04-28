@@ -51,32 +51,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
         $description = mysqli_real_escape_string($connection, $_POST['eventDescription']);
         
         // Handle attendees
-        $attendees = mysqli_real_escape_string($connection, $_POST['attend'] ?? '');
+        $attendees = isset($_POST['attend']) ? $_POST['attend'] : '';
         
         // Handle checkboxes
-        $recurrence = isset($_POST['recurrence']) ;
+        $recurrence = isset($_POST['recurrence']) ? mysqli_real_escape_string($connection, $_POST['recurrence']) : 'none';
         $emailReminder = isset($_POST['emailReminder']) ? 1 : 0;
         $appReminder = isset($_POST['appReminder']) ? 1 : 0;
         $reminderTime = isset($_POST['reminderTime']) 
             ? mysqli_real_escape_string($connection, $_POST['reminderTime']) 
             : '60'; // Default to 1 hour
         
-        // Use prepared statement for security
-        $sql = "INSERT INTO schedule_events (
-                eventTitle, 
-                startDateTime, 
-                endingDateTime, 
-                eventLocation, 
-                eventDescription, 
-                attend, 
-                recurrence,
-                emailReminder,  
-                appReminder, 
-                reminderTime
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
+        // Start transaction
+        mysqli_begin_transaction($connection);
         
-        $stmt = mysqli_prepare($connection, $sql);
-        if ($stmt) {
+        try {
+            // Insert event with prepared statement
+            $sql = "INSERT INTO schedule_events (
+                    eventTitle, 
+                    startDateTime, 
+                    endingDateTime, 
+                    eventLocation, 
+                    eventDescription, 
+                    attend, 
+                    recurrence,
+                    emailReminder,  
+                    appReminder, 
+                    reminderTime
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            
+            $stmt = mysqli_prepare($connection, $sql);
+            if (!$stmt) {
+                throw new Exception("Error preparing statement: " . mysqli_error($connection));
+            }
+            
             mysqli_stmt_bind_param(
                 $stmt, 
                 "sssssssiis", 
@@ -92,17 +99,92 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                 $reminderTime
             );
             
-            if (mysqli_stmt_execute($stmt)) {
-                $success = "Event scheduled successfully!";
-                // Clear form values if needed
-                $_POST = array();
-            } else {
-                $errors[] = "Error executing query: " . mysqli_error($connection);
+            if (!mysqli_stmt_execute($stmt)) {
+                throw new Exception("Error executing query: " . mysqli_error($connection));
             }
             
+            $eventId = mysqli_insert_id($connection);
             mysqli_stmt_close($stmt);
-        } else {
-            $errors[] = "Error preparing statement: " . mysqli_error($connection);
+            
+            // Process attendees if provided
+            if (!empty($attendees)) {
+                $emails = array_map('trim', explode(',', $attendees));
+                $emails = array_filter($emails, function($email) {
+                    return filter_var($email, FILTER_VALIDATE_EMAIL);
+                });
+                
+                if (!empty($emails)) {
+                    $attendeeStmt = mysqli_prepare($connection, 
+                        "INSERT INTO attendees (event_id, email) VALUES (?, ?)");
+                    
+                    if (!$attendeeStmt) {
+                        throw new Exception("Error preparing attendee statement: " . mysqli_error($connection));
+                    }
+                    
+                    foreach ($emails as $email) {
+                        mysqli_stmt_bind_param($attendeeStmt, "is", $eventId, $email);
+                        if (!mysqli_stmt_execute($attendeeStmt)) {
+                            throw new Exception("Error adding attendee: " . mysqli_error($connection));
+                        }
+                    }
+                    mysqli_stmt_close($attendeeStmt);
+                    
+                    // Send initial confirmation to attendees if email reminder is enabled
+                    if ($emailReminder) {
+                      require __DIR__ . '/../vendor/autoload.php';
+                        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                        
+                        try {
+                            // SMTP configuration
+                            $mail->isSMTP();
+                            $mail->Host       = 'smtp.gmail.com';
+                            $mail->SMTPAuth   = true;
+                            $mail->Username   = 'rurangirwakhassim84@gmail.com';
+                            $mail->Password   = 'cbsu vzxr jvgq oiol';
+                            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                            $mail->Port       = 587;
+                            
+                            $mail->setFrom('no-reply@nirdakms.com', 'NIRDA Event System');
+                            $mail->isHTML(true);
+                            
+                            $startDate = new DateTime($startingdate);
+                            $endDate = new DateTime($endingdate);
+                            
+                            foreach ($emails as $email) {
+                                $mail->clearAddresses();
+                                $mail->addAddress($email);
+                                
+                                $mail->Subject = "Invitation: " . $eventtitle;
+                                $mail->Body    = "
+                                    <h2>You're Invited!</h2>
+                                    <p>You've been invited to attend the following event:</p>
+                                    <p><strong>Event:</strong> {$eventtitle}</p>
+                                    <p><strong>Date:</strong> {$startDate->format('F j, Y')}</p>
+                                    <p><strong>Time:</strong> {$startDate->format('g:i A')} - {$endDate->format('g:i A')}</p>
+                                    <p><strong>Location:</strong> {$location}</p>
+                                    <p><strong>Description:</strong> {$description}</p>
+                                    <p>You will receive a reminder {$reminderTime} minutes before the event.</p>
+                                ";
+                                
+                                $mail->send();
+                            }
+                        } catch (Exception $e) {
+                            // Log email error but don't fail the entire operation
+                            error_log("Failed to send invitation emails: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
+            
+            // Commit transaction
+            mysqli_commit($connection);
+            $success = "Event scheduled successfully!";
+            $_POST = array();
+            
+        } catch (Exception $e) {
+            // Rollback on error
+            mysqli_rollback($connection);
+            $errors[] = $e->getMessage();
         }
     }
 }
@@ -110,6 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
 // Close connection
 mysqli_close($connection);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,7 +201,10 @@ mysqli_close($connection);
   <title>Schedule Event | NIRDA Knowledge Management System</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-  <style>
+  
+  <!-- Your CSS styles here (I've omitted them as you mentioned you'll add them back) -->
+  
+    <style>
     /* Color Variables */
     :root {
       --primary-color: #1a237e;
@@ -395,489 +481,229 @@ mysqli_close($connection);
 </head>
 <body>
   <a href=".."></a>
-<?php include_once("../Internees_task/header.php"); ?>
+  <?php include_once("../Internees_task/header.php"); ?>
 
-<div class="main-content">
-  <div class="event-form-container">
-    <div class="form-header">
-      <h2><i class="fas fa-calendar-plus"></i> Schedule New Event</h2>
+  <div class="main-content">
+    <div class="event-form-container">
+      <div class="form-header">
+        <h2><i class="fas fa-calendar-plus"></i> Schedule New Event</h2>
+      </div>
+      
+      <?php if (!empty($errors)): ?>
+        <div class="alert alert-error">
+          <strong>Error!</strong>
+          <ul>
+            <?php foreach ($errors as $error): ?>
+              <li><?php echo htmlspecialchars($error); ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
+      <?php endif; ?>
+      
+      <?php if (isset($success)): ?>
+        <div class="alert alert-success">
+          <?php echo htmlspecialchars($success); ?>
+        </div>
+      <?php endif; ?>
+      
+      <form id="eventForm" class="event-form" method="POST" action="">
+        <!-- Event Title -->
+        <div class="form-group">
+          <label for="eventTitle">
+            <i class="fas fa-heading"></i> Event Title <span class="required">*</span>
+          </label>
+          <input type="text" id="eventTitle" name="eventTitle" class="form-control <?php echo (!empty($_POST)) && empty($_POST['eventTitle']) ? 'is-invalid' : ''; ?>" 
+                 value="<?php echo isset($_POST['eventTitle']) ? htmlspecialchars($_POST['eventTitle']) : ''; ?>" required>
+          <div class="invalid-feedback">Please provide an event title</div>
+        </div>
+        
+        <!-- Date and Time -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="startDateTime">
+              <i class="fas fa-calendar"></i> Start Date & Time <span class="required">*</span>
+            </label>
+            <input type="datetime-local" id="startDateTime" name="startDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['startDateTime']))? 'is-invalid' : ''; ?>" 
+                   value="<?php echo isset($_POST['startDateTime']) ? htmlspecialchars($_POST['startDateTime']) : ''; ?>" required>
+            <div class="invalid-feedback">Please select a start time</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="endDateTime">
+              <i class="fas fa-clock"></i> End Date & Time <span class="required">*</span>
+            </label>
+            <input type="datetime-local" id="endDateTime" name="endDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['endDateTime'])) ? 'is-invalid' : ''; ?>" 
+                   value="<?php echo isset($_POST['endDateTime']) ? htmlspecialchars($_POST['endDateTime']) : ''; ?>" required>
+            <div class="invalid-feedback">
+              <?php 
+                if (!empty($_POST) && !empty($_POST['startDateTime']) && !empty($_POST['endDateTime']) && 
+                    new DateTime($_POST['endDateTime']) <= new DateTime($_POST['startDateTime'])) {
+                  echo "End time must be after start time";
+                } else {
+                  echo "Please select an end time";
+                }
+              ?>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Location -->
+        <div class="form-group">
+          <label for="eventLocation">
+            <i class="fas fa-location-dot"></i> Location <span class="required">*</span>
+          </label>
+          <input type="text" id="eventLocation" name="eventLocation" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventLocation']))? 'is-invalid' : ''; ?>" 
+
+                 value="<?php echo isset($_POST['eventLocation']) ? htmlspecialchars($_POST['eventLocation']) : ''; ?>" 
+                 placeholder="Physical address or meeting URL" required>
+          <div class="invalid-feedback">Please provide a location</div>
+        </div>
+        
+        <!-- Description -->
+        <div class="form-group">
+          <label for="eventDescription">
+            <i class="fas fa-align-left"></i> Description <span class="required">*</span>
+          </label>
+          <textarea id="eventDescription" name="eventDescription" rows="5" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventDescription'])) ? 'is-invalid' : ''; ?>" 
+                    placeholder="Enter event details..." required><?php 
+                    echo isset($_POST['eventDescription']) ? htmlspecialchars($_POST['eventDescription']) : ''; 
+                    ?></textarea>
+          <div class="invalid-feedback">Please provide a description</div>
+        </div>
+        
+        <!-- Attendees -->
+        <div class="form-group">
+          <label for="attend">
+            <i class="fas fa-users"></i> Invite Attendees
+          </label>
+          <input type="text" id="attend" name="attend" class="form-control" 
+                 value="<?php echo isset($_POST['attend']) ? htmlspecialchars($_POST['attend']) : ''; ?>" 
+                 placeholder="Enter email addresses separated by commas">
+          <small class="text-muted">Example: user1@example.com, user2@example.com</small>
+        </div>
+        
+        <!-- Recurring Options -->
+        <div class="form-group">
+          <label for="recurringOption">
+            <i class="fas fa-repeat"></i> Recurrence
+          </label>
+          <select id="recurringOption" name="recurrence" class="form-control">
+            <option value="none" <?php echo (isset($_POST['recurrence']) && $_POST['recurrence'] == 'none') ? 'selected' : ''; ?>>None</option>
+            <option value="daily" <?php echo (isset($_POST['recurrence']) && $_POST['recurrence'] == 'daily') ? 'selected' : ''; ?>>Daily</option>
+            <option value="weekly" <?php echo (isset($_POST['recurrence']) && $_POST['recurrence'] == 'weekly') ? 'selected' : ''; ?>>Weekly</option>
+            <option value="monthly" <?php echo (isset($_POST['recurrence']) && $_POST['recurrence'] == 'monthly') ? 'selected' : ''; ?>>Monthly</option>
+            <option value="yearly" <?php echo (isset($_POST['recurrence']) && $_POST['recurrence'] == 'yearly') ? 'selected' : ''; ?>>Yearly</option>
+          </select>
+        </div>
+        
+        <!-- Reminders -->
+        <div class="reminder-section">
+          <div class="form-group">
+            <label>
+              <i class="fas fa-bell"></i> Reminders
+            </label>
+            <div class="reminder-options">
+              <div class="checkbox-group">
+                <input type="checkbox" id="emailReminder" name="emailReminder" value="1" <?php echo isset($_POST['emailReminder']) ? 'checked' : ''; ?>>
+                <label for="emailReminder">Email Notification</label>
+              </div>
+              <div class="checkbox-group">
+                <input type="checkbox" id="appReminder" name="appReminder" value="1" <?php echo isset($_POST['appReminder']) ? 'checked' : ''; ?>>
+                <label for="appReminder">In-App Notification</label>
+              </div>
+              <div class="reminder-time">
+                <label for="reminderTime">Remind me:</label>
+                <select id="reminderTime" name="reminderTime" class="form-control">
+                  <option value="15" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '15') ? 'selected' : ''; ?>>15 minutes before</option>
+                  <option value="60" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '60') ? 'selected' : ''; ?>>1 hour before</option>
+                  <option value="1440" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '1440') ? 'selected' : ''; ?>>1 day before</option>
+                  <option value="2880" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '2880') ? 'selected' : ''; ?>>2 days before</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancelBtn">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" name="createEvent">
+            <i class="fas fa-calendar-plus"></i> Create Event
+          </button>
+        </div>
+      </form>
     </div>
-    
-    <?php if (!empty($errors)): ?>
-      <div class="alert alert-error">
-        <strong>Error!</strong>
-        <ul>
-          <?php foreach ($errors as $error): ?>
-            <li><?php echo htmlspecialchars($error); ?></li>
-          <?php endforeach; ?>
-        </ul>
-      </div>
-    <?php endif; ?>
-    
-    <?php if (isset($success)): ?>
-      <div class="alert alert-success">
-        <?php echo htmlspecialchars($success); ?>
-      </div>
-    <?php endif; ?>
-    
-    <form id="eventForm" class="event-form" method="POST" action="">
-      <!-- Event Title -->
-      <div class="form-group">
-        <label for="eventTitle">
-          <i class="fas fa-heading"></i> Event Title <span >*</span>
-        </label>
-        <input type="text" id="eventTitle" name="eventTitle" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventTitle'])) ? 'is-invalid' : ''; ?>" 
-               value="<?php echo isset($_POST['eventTitle']) ? htmlspecialchars($_POST['eventTitle']) : ''; ?>">
-        <div class="invalid-feedback">Please provide an event title</div>
-      </div>
-      
-      <!-- Date and Time -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="startDateTime">
-            <i class="fas fa-calendar"></i> Start Date & Time <span >*</span>
-          </label>
-          <input type="datetime-local" id="startDateTime" name="startDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['startDateTime'])) ? 'is-invalid' : ''; ?>" 
-                 value="<?php echo isset($_POST['startDateTime']) ? htmlspecialchars($_POST['startDateTime']) : ''; ?>" >
-          <div class="invalid-feedback">Please select a start time</div>
-        </div>
-        
-        <div class="form-group">
-          <label for="endDateTime">
-            <i class="fas fa-clock"></i> End Date & Time <span >*</span>
-          </label>
-          <input type="datetime-local" id="endDateTime" name="endDateTime" class="form-control <?php echo (!empty($_POST) && empty($_POST['endDateTime'])) ? 'is-invalid' : ''; ?>" 
-                 value="<?php echo isset($_POST['endDateTime']) ? htmlspecialchars($_POST['endDateTime']) : ''; ?>" >
-          <div class="invalid-feedback">
-            <?php 
-              if (!empty($_POST) && !empty($_POST['startDateTime']) && !empty($_POST['endDateTime']) && 
-                  new DateTime($_POST['endDateTime']) <= new DateTime($_POST['startDateTime'])) {
-                echo "End time must be after start time";
-              } else {
-                echo "Please select an end time";
-              }
-            ?>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Location -->
-      <div class="form-group">
-        <label for="eventLocation">
-          <i class="fas fa-location-dot"></i> Location <span >*</span>
-        </label>
-        <input type="text" id="eventLocation" name="eventLocation" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventLocation'])) ? 'is-invalid' : ''; ?>" 
-               value="<?php echo isset($_POST['eventLocation']) ? htmlspecialchars($_POST['eventLocation']) : ''; ?>" 
-               placeholder="Physical address or meeting URL" >
-        <div class="invalid-feedback">Please provide a location</div>
-      </div>
-      
-      <!-- Description -->
-      <div class="form-group">
-        <label for="eventDescription">
-          <i class="fas fa-align-left"></i> Description <span >*</span>
-        </label>
-        <textarea id="eventDescription" name="eventDescription" rows="5" class="form-control <?php echo (!empty($_POST) && empty($_POST['eventDescription'])) ? 'is-invalid' : ''; ?>" 
-                  placeholder="Enter event details..."><?php 
-                  echo isset($_POST['eventDescription']) ? htmlspecialchars($_POST['eventDescription']) : ''; 
-                  ?></textarea>
-        <div class="invalid-feedback">Please provide a description</div>
-      </div>
-      
-      <!-- Attendees -->
-      <div class="form-group">
-        <label for="attend">
-          <i class="fas fa-users"></i> Invite Attendees
-        </label>
-        <input type="text" id="attend" name="attend" class="form-control" 
-               value="<?php echo isset($_POST['attend']) ? htmlspecialchars($_POST['attend']) : ''; ?>" 
-               placeholder="Enter email addresses separated by commas">
-      </div>
-      
-     <!-- Recurring Options -->
-<div class="form-group">
-  <label for="recurringOption">
-    <i class="fas fa-repeat"></i> Recurrence
-  </label>
-  <select id="recurringOption" name="recurrence" class="form-control">
-    <option value="none">None</option>
-    <option value="daily">Daily</option>
-    <option value="weekly">Weekly</option>
-    <option value="monthly">Monthly</option>
-    <option value="yearly">Yearly</option>
-  </select>
-</div>
-      
-      <!-- Reminders -->
-      <div class="reminder-section">
-        <div class="form-group">
-          <label>
-            <i class="fas fa-bell"></i> Reminders
-          </label>
-          <div class="reminder-options">
-            <div class="checkbox-group">
-              <input type="checkbox" id="emailReminder" name="emailReminder" value="1" <?php echo isset($_POST['emailReminder']) ? 'checked' : ''; ?>>
-              <label for="emailReminder">Email Notification</label>
-            </div>
-            <div class="checkbox-group">
-              <input type="checkbox" id="appReminder" name="appReminder" value="1" <?php echo isset($_POST['appReminder']) ? 'checked' : ''; ?>>
-              <label for="appReminder">In-App Notification</label>
-            </div>
-            <div class="reminder-time">
-              <label for="reminderTime">Remind me:</label>
-              <select id="reminderTime" name="reminderTime" class="form-control">
-                <option value="15" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '15') ? 'selected' : ''; ?>>15 minutes before</option>
-                <option value="60" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '60') ? 'selected' : ''; ?>>1 hour before</option>
-                <option value="1440" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '1440') ? 'selected' : ''; ?>>1 day before</option>
-                <option value="2880" <?php echo (isset($_POST['reminderTime']) && $_POST['reminderTime'] == '2880') ? 'selected' : ''; ?>>2 days before</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Form Actions -->
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" id="cancelBtn">
-          <i class="fas fa-times"></i> Cancel
-        </button>
-        <button type="submit" class="btn btn-primary" name="createEvent">
-          <i class="fas fa-calendar-plus"></i> Create Event
-        </button>
-      </div>
-    </form>
   </div>
-</div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-
-setTimeout(() => {
-    const successMessage = document.querySelector(".alert-success");
-    if (successMessage) {
-        successMessage.style.display = "none";
-    }
-}, 3000); // 3 seconds
-
-
-
-
-
-
-
-
-
-
-
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. Prevent default HTML5 validation bubbles
-    document.addEventListener('invalid', function(e) {
-        e.preventDefault();
-        
-        // Add custom invalid class
-        e.target.classList.add('is-invalid');
-        
-        // Create or show custom error message
-        let errorMsg = e.target.nextElementSibling;
-        if (!errorMsg || !errorMsg.classList.contains('custom-error')) {
-            errorMsg = document.createElement('div');
-            errorMsg.className = 'custom-error';
-            errorMsg.style.color = '#dc3545';
-            errorMsg.style.fontSize = '0.875rem';
-            errorMsg.style.marginTop = '0.25rem';
-            e.target.parentNode.insertBefore(errorMsg, e.target.nextSibling);
-        }
-        
-        // Set custom message based on which field is invalid
-        const fieldName = e.target.name;
-        let message = 'This field is required';
-        
-        if (fieldName === 'eventTitle' && e.target.value.length > 100) {
-            message = 'Title must be less than 100 characters';
-        } else if (fieldName === 'endDateTime' && e.target.value) {
-            const startTime = document.getElementById('startDateTime').value;
-            if (startTime && e.target.value <= startTime) {
-                message = 'End time must be after start time';
-            }
-        }
-        
-        errorMsg.textContent = message;
-    }, true);
-
-    // 2. Clear validation when user starts typing
-    const formFields = document.querySelectorAll('#eventForm input, #eventForm textarea, #eventForm select');
-    formFields.forEach(field => {
-        field.addEventListener('input', function() {
-            if (this.checkValidity()) {
-                this.classList.remove('is-invalid');
-                const errorMsg = this.nextElementSibling;
-                if (errorMsg && errorMsg.classList.contains('custom-error')) {
-                    errorMsg.textContent = '';
-                }
-            }
-        });
-    });
-
-    // 3. Custom form submission handling
-    document.getElementById('eventForm').addEventListener('submit', function(e) {
-        // First force validation check
-        let formValid = true;
-        const requiredFields = this.querySelectorAll('[required]');
-        
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                field.classList.add('is-invalid');
-                let errorMsg = field.nextElementSibling;
-                if (!errorMsg || !errorMsg.classList.contains('custom-error')) {
-                    errorMsg = document.createElement('div');
-                    errorMsg.className = 'custom-error';
-                    errorMsg.style.color = '#dc3545';
-                    errorMsg.style.fontSize = '0.875rem';
-                    errorMsg.style.marginTop = '0.25rem';
-                    field.parentNode.insertBefore(errorMsg, field.nextSibling);
-                }
-                errorMsg.textContent = 'This field is required';
-                formValid = false;
-            }
-        });
-
-        // Additional custom validations
-        const titleField = document.getElementById('eventTitle');
-        if (titleField.value.length > 100) {
-            titleField.classList.add('is-invalid');
-            let errorMsg = titleField.nextElementSibling;
-            if (!errorMsg || !errorMsg.classList.contains('custom-error')) {
-                errorMsg = document.createElement('div');
-                errorMsg.className = 'custom-error';
-                errorMsg.style.color = '#dc3545';
-                errorMsg.style.fontSize = '0.875rem';
-                errorMsg.style.marginTop = '0.25rem';
-                titleField.parentNode.insertBefore(errorMsg, titleField.nextSibling);
-            }
-            errorMsg.textContent = 'Title must be less than 100 characters';
-            formValid = false;
-        }
-
-        const startTime = document.getElementById('startDateTime').value;
-        const endTime = document.getElementById('endDateTime').value;
-        if (startTime && endTime && endTime <= startTime) {
-            const endField = document.getElementById('endDateTime');
-            endField.classList.add('is-invalid');
-            let errorMsg = endField.nextElementSibling;
-            if (!errorMsg || !errorMsg.classList.contains('custom-error')) {
-                errorMsg = document.createElement('div');
-                errorMsg.className = 'custom-error';
-                errorMsg.style.color = '#dc3545';
-                errorMsg.style.fontSize = '0.875rem';
-                errorMsg.style.marginTop = '0.25rem';
-                endField.parentNode.insertBefore(errorMsg, endField.nextSibling);
-            }
-            errorMsg.textContent = 'End time must be after start time';
-            formValid = false;
-        }
-
-        if (!formValid) {
-            e.preventDefault();
-            // Scroll to first invalid field
-            const firstInvalid = this.querySelector('.is-invalid');
-            if (firstInvalid) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-    });
-});
-
-
-
-
-$(document).ready(function() {
-   
-    
-    // Highlight current menu item
-    $('.main-nav a[href="schedule_event.php"]').addClass('active');
-
-    // Real-time validation for all fields
-    $('#eventTitle').on('input', validateTitle);
-    $('#startDateTime, #endDateTime').on('change', validateDates);
-    $('#eventLocation').on('input', validateLocation);
-    $('#eventDescription').on('input', validateDescription);
-    
-    // Form submission handler
-    $('#eventForm').on('submit', function(e) {
-        // Validate all fields
-        const isTitleValid = validateTitle();
-        const areDatesValid = validateDates();
-        const isLocationValid = validateLocation();
-        const isDescriptionValid = validateDescription();
-        
-        if (!isTitleValid || !areDatesValid || !isLocationValid || !isDescriptionValid) {
-            e.preventDefault();
-            // Scroll to first error
-            $('.is-invalid').first().focus();
-        }
-    });
-    
-    // Cancel button
-    $('#cancelBtn').on('click', function() {
-        if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-            window.location.href = 'events.php';
-        }
-    });
-    
-    // Auto-adjust for footer height
-    function adjustForFooter() {
-        const footerHeight = $('.footer').outerHeight();
-        $('.main-content').css('padding-bottom', footerHeight + 20);
-    }
-    
-    adjustForFooter();
-    $(window).resize(adjustForFooter);
-
-    // Field validation functions
-    function validateTitle() {
-        const title = $('#eventTitle').val().trim();
-        const isValid = title.length > 0;
-        
-        $('#eventTitle').toggleClass('is-invalid', !isValid);
-        $('#eventTitle').next('.invalid-feedback').toggle(!isValid);
-        
-        return isValid;
-    }
-    
-    function validateDates() {
-        const startTime = $('#startDateTime').val();
-        const endTime = $('#endDateTime').val();
-        let isValid = true;
-        
-        // Validate start time
-        if (!startTime) {
-            $('#startDateTime').addClass('is-invalid');
-            $('#startDateTime').next('.invalid-feedback').text('Please select a start time').show();
-            isValid = false;
-        } else {
-            $('#startDateTime').removeClass('is-invalid');
-            $('#startDateTime').next('.invalid-feedback').hide();
-        }
-        
-        // Validate end time
-        if (!endTime) {
-            $('#endDateTime').addClass('is-invalid');
-            $('#endDateTime').next('.invalid-feedback').text('Please select an end time').show();
-            isValid = false;
-        } else if (startTime && new Date(endTime) <= new Date(startTime)) {
-            $('#endDateTime').addClass('is-invalid');
-            $('#endDateTime').next('.invalid-feedback').text('End time must be after start time').show();
-            isValid = false;
-        } else {
-            $('#endDateTime').removeClass('is-invalid');
-            $('#endDateTime').next('.invalid-feedback').hide();
-        }
-        
-        return isValid;
-    }
-    
-    function validateLocation() {
-        const location = $('#eventLocation').val().trim();
-        const isValid = location.length > 0;
-        
-        $('#eventLocation').toggleClass('is-invalid', !isValid);
-        $('#eventLocation').next('.invalid-feedback').toggle(!isValid);
-        
-        return isValid;
-    }
-    
-    function validateDescription() {
-        const description = $('#eventDescription').val().trim();
-        const isValid = description.length > 0;
-        
-        $('#eventDescription').toggleClass('is-invalid', !isValid);
-        $('#eventDescription').next('.invalid-feedback').toggle(!isValid);
-        
-        return isValid;
-    }
-});
-
-// Sidebar Toggle Functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarCollapse');
-    
-    // Initialize from localStorage
-    if(localStorage.getItem('sidebarState') === 'open') {
-        sidebar.classList.add('active');
-        document.body.classList.add('sidebar-open');
-        document.querySelector('.main-content')?.classList.add('sidebar-active');
-    }
-    
-    // Toggle sidebar
-    if(toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const isOpening = !sidebar.classList.contains('active');
-            
-            sidebar.classList.toggle('active');
-            document.body.classList.toggle('sidebar-open');
-            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
-            
-            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
-        });
-    }
-    
-    // Highlight current page in sidebar
-    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        if(link.getAttribute('href').includes(currentPage)) {
-            link.classList.add('active');
-        }
-    });
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
- // Sidebar Toggle Functionality
- document.addEventListener('DOMContentLoaded', function() {
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebarCollapse');
-    
-    // Initialize from localStorage
-    if(localStorage.getItem('sidebarState') === 'open') {
-        sidebar.classList.add('active');
-        document.body.classList.add('sidebar-open');
-        document.querySelector('.main-content')?.classList.add('sidebar-active');
-    }
-    
-    // Toggle sidebar
-    if(toggleBtn) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const isOpening = !sidebar.classList.contains('active');
-            
-            sidebar.classList.toggle('active');
-            document.body.classList.toggle('sidebar-open');
-            document.querySelector('.main-content')?.classList.toggle('sidebar-active');
-            
-            localStorage.setItem('sidebarState', isOpening ? 'open' : 'closed');
-        });
-    }
-    
-    // Highlight current page in sidebar
-    const currentPage = window.location.pathname.split('/').pop() || 'index.php';
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        if(link.getAttribute('href').includes(currentPage)) {
-            link.classList.add('active');
-        }
-    });
-});
-</script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+  $(document).ready(function() {
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+          $('.alert-success').fadeOut();
+      }, 3000);
+      
+      // Form validation
+      $('#eventForm').on('submit', function(e) {
+          let isValid = true;
+          
+          // Validate required fields
+          $('[required]').each(function() {
+              if (!$(this).val().trim()) {
+                  $(this).addClass('is-invalid');
+                  isValid = false;
+              } else {
+                  $(this).removeClass('is-invalid');
+              }
+          });
+          
+          // Validate date range
+          const startDate = new Date($('#startDateTime').val());
+          const endDate = new Date($('#endDateTime').val());
+          
+          if (startDate && endDate && endDate <= startDate) {
+              $('#endDateTime').addClass('is-invalid');
+              $('#endDateTime').next('.invalid-feedback').text('End time must be after start time');
+              isValid = false;
+          }
+          
+          // Validate email format if attendees provided
+          const attendEmails = $('#attend').val().trim();
+          if (attendEmails) {
+              const emails = attendEmails.split(',');
+              for (const email of emails) {
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+                      $('#attend').addClass('is-invalid');
+                      $('#attend').next('.text-muted').addClass('text-danger').text('Invalid email format: ' + email.trim());
+                      isValid = false;
+                      break;
+                  }
+              }
+          }
+          
+          if (!isValid) {
+              e.preventDefault();
+              $('.is-invalid').first().focus();
+          }
+      });
+      
+      // Cancel button
+      $('#cancelBtn').on('click', function() {
+          if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+              window.location.href = 'manage_events.php';
+          }
+      });
+      
+      // Clear validation on input
+      $('input, textarea, select').on('input change', function() {
+          $(this).removeClass('is-invalid');
+          if ($(this).attr('id') === 'attend') {
+              $(this).next('.text-muted').removeClass('text-danger').text('Example: user1@example.com, user2@example.com');
+          }
+      });
+  });
+  </script>
 </body>
 </html>

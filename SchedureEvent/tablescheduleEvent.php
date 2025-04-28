@@ -1,23 +1,25 @@
 <?php
 include 'connect.php';
 
-// SQL to create forum_topics table
-$sql = "CREATE TABLE `forum_replies` (
-  `reply_id` int(11) NOT NULL,
-  `topic_id` int(11) NOT NULL,
+// SQL to create attendees table
+$sql = "CREATE TABLE `group_members` (
+  `member_id` int(11) NOT NULL AUTO_INCREMENT,
+  `group_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `content` text NOT NULL,
-  `is_flagged` tinyint(1) DEFAULT 0,
-  `flag_reason` varchar(255) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_admin` tinyint(1) DEFAULT 0,
+  PRIMARY KEY (`member_id`),
+  UNIQUE KEY `unique_membership` (`group_id`,`user_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_group_member` FOREIGN KEY (`group_id`) REFERENCES `chat_groups` (`group_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_member_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ";
 
 
 // Execute query
 if (mysqli_query($connection, $sql)) {
-    echo "Table schedule_events created successfully";
+    echo "Table attendees created successfully";
 } else {
     echo "Error creating table: " . mysqli_error($connection);
 }

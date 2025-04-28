@@ -1,11 +1,204 @@
+<?php
+session_start();
+// Database connection
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "NIRDAKMS";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;  
+}
+
+$userId = $_SESSION['user_id'];
+$username = $_SESSION['username'] ?? 'User';
+
+// Fetch user's private conversations
+$privateChats = [];
+$privateQuery = "SELECT 
+    pc.conversation_id, 
+    CASE 
+        WHEN pc.user1_id = $userId THEN u2.user_id 
+        ELSE u1.user_id 
+    END as other_user_id,
+    CASE 
+        WHEN pc.user1_id = $userId THEN u2.username 
+        ELSE u1.username 
+    END as other_username,
+    CASE 
+        WHEN pc.user1_id = $userId THEN u2.full_name 
+        ELSE u1.full_name 
+    END as other_full_name,
+    m.content as last_message,
+    m.sent_at as last_message_time,
+    us.is_online,
+    us.last_seen
+FROM private_conversations pc
+LEFT JOIN users u1 ON pc.user1_id = u1.user_id
+LEFT JOIN users u2 ON pc.user2_id = u2.user_id
+LEFT JOIN messages m ON m.message_id = (
+    SELECT message_id FROM messages 
+    WHERE (conversation_id = pc.conversation_id)
+    ORDER BY sent_at DESC LIMIT 1
+)
+LEFT JOIN user_status us ON us.user_id = CASE 
+    WHEN pc.user1_id = $userId THEN pc.user2_id 
+    ELSE pc.user1_id 
+END
+WHERE pc.user1_id = $userId OR pc.user2_id = $userId
+ORDER BY m.sent_at DESC";
+$privateResult = mysqli_query($conn, $privateQuery);
+while ($row = mysqli_fetch_assoc($privateResult)) {
+    $privateChats[] = $row;
+}
+
+// Fetch user's group chats
+$groupChats = [];
+$groupQuery = "SELECT 
+    g.group_id,
+    g.group_name,
+    g.description,
+    m.content as last_message,
+    m.sent_at as last_message_time,
+    (SELECT COUNT(*) FROM group_members WHERE group_id = g.group_id) as member_count
+FROM group_members gm
+JOIN chat_groups g ON gm.group_id = g.group_id
+LEFT JOIN messages m ON m.message_id = (
+    SELECT message_id FROM messages 
+    WHERE (group_id = g.group_id)
+    ORDER BY sent_at DESC LIMIT 1
+)
+WHERE gm.user_id = $userId AND g.is_active = 1
+ORDER BY m.sent_at DESC";
+$groupResult = mysqli_query($conn, $groupQuery);
+while ($row = mysqli_fetch_assoc($groupResult)) {
+    $groupChats[] = $row;
+}
+
+// Handle new message submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
+    $content = trim($_POST['message_content']);
+    $chatType = $_POST['chat_type'];
+    $chatId = $_POST['chat_id'];
+    
+    if (!empty($content)) {
+        if ($chatType === 'private') {
+            // Find the conversation ID between current user and the other user
+            $convQuery = "SELECT conversation_id FROM private_conversations 
+                          WHERE (user1_id = $userId AND user2_id = $chatId) 
+                          OR (user2_id = $userId AND user1_id = $chatId)";
+            $convResult = mysqli_query($conn, $convQuery);
+            $convRow = mysqli_fetch_assoc($convResult);
+            $conversationId = $convRow['conversation_id'];
+            
+            // Insert message
+            $insertQuery = "INSERT INTO messages (conversation_id, sender_id, content) 
+                            VALUES ($conversationId, $userId, '$content')";
+            mysqli_query($conn, $insertQuery);
+            
+            // Update conversation last message time
+            $updateQuery = "UPDATE private_conversations 
+                            SET last_message_at = NOW() 
+                            WHERE conversation_id = $conversationId";
+            mysqli_query($conn, $updateQuery);
+        } elseif ($chatType === 'group') {
+            // Insert message to group
+            $insertQuery = "INSERT INTO messages (group_id, sender_id, content) 
+                            VALUES ($chatId, $userId, '$content')";
+            mysqli_query($conn, $insertQuery);
+            
+            // Update group last updated time
+            $updateQuery = "UPDATE chat_groups 
+                            SET updated_at = NOW() 
+                            WHERE group_id = $chatId";
+            mysqli_query($conn, $updateQuery);
+        }
+        
+        // Return success response
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+}
+
+// Handle fetching messages for a chat
+if (isset($_GET['fetch_messages'])) {
+    $chatType = $_GET['chat_type'];
+    $chatId = $_GET['chat_id'];
+    $messages = [];
+    
+    if ($chatType === 'private') {
+        // Find conversation ID
+        $convQuery = "SELECT conversation_id FROM private_conversations 
+                      WHERE (user1_id = $userId AND user2_id = $chatId) 
+                      OR (user2_id = $userId AND user1_id = $chatId)";
+        $convResult = mysqli_query($conn, $convQuery);
+        $convRow = mysqli_fetch_assoc($convResult);
+        $conversationId = $convRow['conversation_id'];
+        
+        // Fetch messages
+        $messageQuery = "SELECT m.*, u.username, u.full_name 
+                         FROM messages m
+                         JOIN users u ON m.sender_id = u.user_id
+                         WHERE m.conversation_id = $conversationId
+                         ORDER BY m.sent_at ASC";
+        $messageResult = mysqli_query($conn, $messageQuery);
+        while ($row = mysqli_fetch_assoc($messageResult)) {
+            $messages[] = [
+                'id' => $row['message_id'],
+                'sender_id' => $row['sender_id'],
+                'sender_name' => $row['full_name'],
+                'username' => $row['username'],
+                'content' => $row['content'],
+                'time' => date('h:i A', strtotime($row['sent_at'])),
+                'is_sent' => ($row['sender_id'] == $userId)
+            ];
+        }
+    } elseif ($chatType === 'group') {
+        // Fetch group messages
+        $messageQuery = "SELECT m.*, u.username, u.full_name 
+                         FROM messages m
+                         JOIN users u ON m.sender_id = u.user_id
+                         WHERE m.group_id = $chatId
+                         ORDER BY m.sent_at ASC";
+        $messageResult = mysqli_query($conn, $messageQuery);
+        while ($row = mysqli_fetch_assoc($messageResult)) {
+            $messages[] = [
+                'id' => $row['message_id'],
+                'sender_id' => $row['sender_id'],
+                'sender_name' => $row['full_name'],
+                'username' => $row['username'],
+                'content' => $row['content'],
+                'time' => date('h:i A', strtotime($row['sent_at'])),
+                'is_sent' => ($row['sender_id'] == $userId)
+            ];
+        }
+    }
+    
+    // Return messages as JSON
+    echo json_encode($messages);
+    exit;
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Application - Chat Types</title>
+    <title>Chat Application - Messages</title>
     <style>
-        /* Internal CSS */
+        /* Your existing CSS styles */
         :root {
             --primary-color: #0084ff;
             --secondary-color: #f0f2f5;
@@ -123,13 +316,13 @@
             border-radius: 50%;
             margin-right: 10px;
             position: relative;
-        }
-        
-        .chat-avatar img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
+            background-color: #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-weight: bold;
+            font-size: 20px;
         }
         
         .online-status {
@@ -227,6 +420,7 @@
             border-radius: 18px;
             margin-bottom: 5px;
             position: relative;
+            word-break: break-word;
         }
         
         .message.sent .message-content {
@@ -299,7 +493,14 @@
             margin-bottom: 10px;
         }
         
-        /* Responsive adjustments */
+        .group-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #e0e0e0;
+            color: #555;
+        }
+        
         @media (max-width: 768px) {
             .sidebar {
                 width: 100%;
@@ -335,7 +536,49 @@
         </div>
         
         <div class="chat-list" id="chat-list">
-            <!-- Chat items will be populated by JavaScript -->
+            <!-- Private chats -->
+            <?php foreach ($privateChats as $chat): ?>
+                <div class="chat-item" data-type="private" data-id="<?= $chat['other_user_id'] ?>">
+                    <div class="chat-avatar">
+                        <?= substr($chat['other_full_name'], 0, 1) ?>
+                        <?php if ($chat['is_online']): ?>
+                            <div class="online-status"></div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-name">
+                            <?= htmlspecialchars($chat['other_full_name']) ?>
+                            <span class="chat-time">
+                                <?= $chat['last_message_time'] ? date('h:i A', strtotime($chat['last_message_time'])) : '' ?>
+                            </span>
+                        </div>
+                        <div class="chat-preview">
+                            <?= htmlspecialchars($chat['last_message'] ?? 'No messages yet') ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            
+            <!-- Group chats -->
+            <?php foreach ($groupChats as $chat): ?>
+                <div class="chat-item" data-type="group" data-id="<?= $chat['group_id'] ?>">
+                    <div class="chat-avatar group-avatar">
+                        <?= substr($chat['group_name'], 0, 1) ?>
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-name">
+                            <?= htmlspecialchars($chat['group_name']) ?>
+                            <span class="chat-time">
+                                <?= $chat['last_message_time'] ? date('h:i A', strtotime($chat['last_message_time'])) : '' ?>
+                            </span>
+                        </div>
+                        <div class="chat-preview">
+                            <?= htmlspecialchars($chat['last_message'] ?? 'No messages yet') ?>
+                            <span class="chat-members"><?= $chat['member_count'] ?> members</span>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
     
@@ -348,244 +591,122 @@
     </div>
     
     <script>
-        // Sample data for chats
-        const chats = [
-            {
-                id: 1,
-                name: "John Doe",
-                type: "private",
-                avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-                online: true,
-                starred: false,
-                lastMessage: "Hey, how are you doing?",
-                lastMessageTime: "10:30 AM",
-                messages: [
-                    {
-                        id: 1,
-                        sender: "John Doe",
-                        content: "Hey there!",
-                        time: "10:20 AM",
-                        status: "read"
-                    },
-                    {
-                        id: 2,
-                        sender: "You",
-                        content: "Hi John!",
-                        time: "10:25 AM",
-                        status: "read"
-                    },
-                    {
-                        id: 3,
-                        sender: "John Doe",
-                        content: "Hey, how are you doing?",
-                        time: "10:30 AM",
-                        status: "delivered"
-                    }
-                ]
-            },
-            {
-                id: 2,
-                name: "Sarah Smith",
-                type: "private",
-                avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-                online: false,
-                starred: true,
-                lastMessage: "The meeting is at 2 PM",
-                lastMessageTime: "Yesterday",
-                messages: [
-                    {
-                        id: 1,
-                        sender: "Sarah Smith",
-                        content: "Don't forget about our meeting tomorrow",
-                        time: "Yesterday, 5:30 PM",
-                        status: "read"
-                    },
-                    {
-                        id: 2,
-                        sender: "You",
-                        content: "What time is it?",
-                        time: "Yesterday, 5:35 PM",
-                        status: "read"
-                    },
-                    {
-                        id: 3,
-                        sender: "Sarah Smith",
-                        content: "The meeting is at 2 PM",
-                        time: "Yesterday, 5:36 PM",
-                        status: "read"
-                    }
-                ]
-            },
-            {
-                id: 3,
-                name: "Team Project",
-                type: "group",
-                avatar: "https://randomuser.me/api/portraits/lego/3.jpg",
-                online: false,
-                starred: false,
-                lastMessage: "Alice: I've finished the design",
-                lastMessageTime: "Monday",
-                members: ["You", "Alice", "Bob", "Charlie"],
-                messages: [
-                    {
-                        id: 1,
-                        sender: "Bob",
-                        content: "How's everyone doing with their tasks?",
-                        time: "Monday, 9:00 AM",
-                        status: "read"
-                    },
-                    {
-                        id: 2,
-                        sender: "You",
-                        content: "I'm almost done with the backend",
-                        time: "Monday, 9:15 AM",
-                        status: "read"
-                    },
-                    {
-                        id: 3,
-                        sender: "Alice",
-                        content: "I've finished the design",
-                        time: "Monday, 9:30 AM",
-                        status: "read"
-                    }
-                ]
-            },
-            {
-                id: 4,
-                name: "Family Group",
-                type: "group",
-                avatar: "https://randomuser.me/api/portraits/lego/4.jpg",
-                online: false,
-                starred: true,
-                lastMessage: "Mom: Don't forget Sunday dinner",
-                lastMessageTime: "Sunday",
-                members: ["You", "Mom", "Dad", "Sister"],
-                messages: [
-                    {
-                        id: 1,
-                        sender: "Mom",
-                        content: "How is everyone?",
-                        time: "Sunday, 12:00 PM",
-                        status: "read"
-                    },
-                    {
-                        id: 2,
-                        sender: "You",
-                        content: "I'm good!",
-                        time: "Sunday, 12:05 PM",
-                        status: "read"
-                    },
-                    {
-                        id: 3,
-                        sender: "Mom",
-                        content: "Don't forget Sunday dinner",
-                        time: "Sunday, 12:10 PM",
-                        status: "read"
-                    }
-                ]
-            }
-        ];
-        
         // DOM elements
         const chatList = document.getElementById('chat-list');
         const mainChat = document.getElementById('main-chat');
         const chatTypes = document.querySelectorAll('.chat-type');
         
-        // Current active chat type filter
-        let currentFilter = 'all';
+        // Current active chat
+        let currentChat = null;
         
-        // Render chat list based on filter
-        function renderChatList(filter = 'all') {
-            chatList.innerHTML = '';
-            
-            const filteredChats = chats.filter(chat => {
-                if (filter === 'all') return true;
-                if (filter === 'starred') return chat.starred;
-                return chat.type === filter;
+        // Initialize chat type filters
+        chatTypes.forEach(type => {
+            type.addEventListener('click', () => {
+                chatTypes.forEach(t => t.classList.remove('active'));
+                type.classList.add('active');
+                filterChats(type.dataset.type);
             });
+        });
+        
+        // Filter chats by type
+        function filterChats(type) {
+            const allChats = document.querySelectorAll('.chat-item');
             
-            if (filteredChats.length === 0) {
-                chatList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--light-text);">No chats found</div>';
-                return;
-            }
-            
-            filteredChats.forEach(chat => {
-                const chatItem = document.createElement('div');
-                chatItem.className = 'chat-item';
-                chatItem.dataset.id = chat.id;
-                
-                chatItem.innerHTML = `
-                    <div class="chat-avatar">
-                        <img src="${chat.avatar}" alt="${chat.name}">
-                        ${chat.online ? '<div class="online-status"></div>' : ''}
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-name">
-                            ${chat.name}
-                            <span class="chat-time">${chat.lastMessageTime}</span>
-                        </div>
-                        <div class="chat-preview">
-                            ${chat.lastMessage}
-                            ${chat.starred ? '<span class="star-icon">★</span>' : ''}
-                        </div>
-                    </div>
-                `;
-                
-                chatItem.addEventListener('click', () => renderChat(chat.id));
-                chatList.appendChild(chatItem);
+            allChats.forEach(chat => {
+                if (type === 'all') {
+                    chat.style.display = 'flex';
+                } else if (type === 'starred') {
+                    // Implement starred functionality if needed
+                    chat.style.display = 'none';
+                } else {
+                    chat.style.display = chat.dataset.type === type ? 'flex' : 'none';
+                }
             });
         }
         
-        // Render a specific chat
-        function renderChat(chatId) {
-            const chat = chats.find(c => c.id == chatId);
-            if (!chat) return;
+        // Handle chat selection
+        chatList.addEventListener('click', (e) => {
+            const chatItem = e.target.closest('.chat-item');
+            if (!chatItem) return;
             
-            // Highlight selected chat in list
+            // Highlight selected chat
             document.querySelectorAll('.chat-item').forEach(item => {
                 item.classList.remove('active');
-                if (item.dataset.id == chatId) item.classList.add('active');
             });
+            chatItem.classList.add('active');
+            
+            // Set current chat
+            currentChat = {
+                type: chatItem.dataset.type,
+                id: chatItem.dataset.id
+            };
+            
+            // Load chat messages
+            loadChatMessages(currentChat.type, currentChat.id);
+        });
+        
+        // Load messages for a specific chat
+        function loadChatMessages(chatType, chatId) {
+            fetch(`chat_groups.php?fetch_messages=1&chat_type=${chatType}&chat_id=${chatId}`)
+                .then(response => response.json())
+                .then(messages => {
+                    renderChat(chatType, chatId, messages);
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
+                });
+        }
+        
+        // Render chat with messages
+        function renderChat(chatType, chatId, messages) {
+            // Get chat info from the clicked item
+            const chatItem = document.querySelector(`.chat-item[data-id="${chatId}"]`);
+            if (!chatItem) return;
+            
+            const chatName = chatItem.querySelector('.chat-name').textContent.split('\n')[0].trim();
+            const isOnline = chatItem.querySelector('.online-status') !== null;
+            const memberCount = chatItem.querySelector('.chat-members')?.textContent || '';
             
             // Render chat header
             let headerHTML = `
                 <div class="chat-avatar">
-                    <img src="${chat.avatar}" alt="${chat.name}">
-                    ${chat.online ? '<div class="online-status"></div>' : ''}
+                    ${chatItem.querySelector('.chat-avatar').innerHTML}
                 </div>
                 <div class="chat-header-info">
-                    <div class="chat-header-name">${chat.name}</div>
+                    <div class="chat-header-name">${chatName}</div>
                     <div class="chat-header-status">
-                        ${chat.online ? 'Online' : (chat.type === 'private' ? 'Last seen today at 12:45 PM' : `${chat.members.length} members`)}
+                        ${chatType === 'private' ? 
+                            (isOnline ? 'Online' : 'Offline') : 
+                            memberCount}
                     </div>
                 </div>
             `;
             
             // Render messages
             let messagesHTML = '';
-            chat.messages.forEach(message => {
-                const isSent = message.sender === 'You';
+            messages.forEach(message => {
                 messagesHTML += `
-                    <div class="message ${isSent ? 'sent' : 'received'}">
-                        ${!isSent && chat.type === 'group' ? '<div style="font-size: 12px; margin-bottom: 2px;">' + message.sender + '</div>' : ''}
+                    <div class="message ${message.is_sent ? 'sent' : 'received'}">
+                        ${chatType === 'group' && !message.is_sent ? 
+                            `<div style="font-size: 12px; margin-bottom: 2px;">${message.sender_name}</div>` : ''}
                         <div class="message-content">${message.content}</div>
                         <div class="message-time">
                             ${message.time}
-                            ${isSent ? '<span class="message-status">' + (message.status === 'read' ? '✓✓' : '✓') + '</span>' : ''}
+                            ${message.is_sent ? '<span class="message-status">✓✓</span>' : ''}
                         </div>
                     </div>
                 `;
             });
             
             // Add typing indicator if online
-            if (chat.online && chat.type === 'private') {
-                messagesHTML += '<div class="typing-indicator">' + chat.name + ' is typing...</div>';
+            if (isOnline && chatType === 'private') {
+                messagesHTML += `<div class="typing-indicator">${chatName} is typing...</div>`;
             }
             
             // Render input area
             let inputHTML = `
-                <input type="text" placeholder="Type a message...">
-                <button class="send-button">➤</button>
+                <input type="text" placeholder="Type a message..." id="message-input">
+                <button class="send-button" id="send-button">➤</button>
             `;
             
             // Update main chat area
@@ -593,7 +714,7 @@
                 <div class="chat-header">
                     ${headerHTML}
                 </div>
-                <div class="chat-messages">
+                <div class="chat-messages" id="messages-container">
                     ${messagesHTML}
                 </div>
                 <div class="chat-input">
@@ -602,61 +723,48 @@
             `;
             
             // Scroll to bottom of messages
-            const messagesContainer = mainChat.querySelector('.chat-messages');
+            const messagesContainer = document.getElementById('messages-container');
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
             // Add event listener for sending messages
-            const sendButton = mainChat.querySelector('.send-button');
-            const inputField = mainChat.querySelector('input');
+            const sendButton = document.getElementById('send-button');
+            const inputField = document.getElementById('message-input');
             
-            sendButton.addEventListener('click', () => {
+            function sendMessage() {
                 const messageContent = inputField.value.trim();
-                if (messageContent) {
-                    // In a real app, this would be sent to the server via AJAX
-                    const newMessage = {
-                        id: chat.messages.length + 1,
-                        sender: 'You',
-                        content: messageContent,
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        status: 'sent'
-                    };
-                    
-                    chat.messages.push(newMessage);
-                    chat.lastMessage = messageContent;
-                    chat.lastMessageTime = 'Just now';
-                    
-                    // Update both the chat list and the main chat
-                    renderChatList(currentFilter);
-                    renderChat(chatId);
-                    
-                    inputField.value = '';
+                if (messageContent && currentChat) {
+                    fetch('chat_groups.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `message_content=${encodeURIComponent(messageContent)}&chat_type=${currentChat.type}&chat_id=${currentChat.id}`
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            inputField.value = '';
+                            loadChatMessages(currentChat.type, currentChat.id);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending message:', error);
+                    });
                 }
-            });
+            }
             
-            // Also send on Enter key
+            sendButton.addEventListener('click', sendMessage);
+            
             inputField.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    sendButton.click();
+                    sendMessage();
                 }
             });
         }
         
-        // Initialize chat type filters
-        chatTypes.forEach(type => {
-            type.addEventListener('click', () => {
-                chatTypes.forEach(t => t.classList.remove('active'));
-                type.classList.add('active');
-                currentFilter = type.dataset.type;
-                renderChatList(currentFilter);
-            });
-        });
-        
-        // Initialize with all chats
-        renderChatList();
-        
         // New chat button functionality
         document.getElementById('new-chat-btn').addEventListener('click', () => {
-            alert('In a real app, this would open a new chat dialog');
+            alert('New chat functionality would be implemented here');
         });
     </script>
 </body>
