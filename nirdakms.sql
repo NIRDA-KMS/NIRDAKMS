@@ -1,4 +1,4 @@
--- phpMyAdmin SQL Dump
+!-- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
@@ -228,9 +228,8 @@ CREATE TABLE `private_conversations` (
 --
 -- Table structure for table `schedule_events`
 --
-
 CREATE TABLE `schedule_events` (
-  `event_id` int(11) NOT NULL,
+  `event_id` int(11) NOT NULL AUTO_INCREMENT,
   `eventTitle` varchar(100) NOT NULL,
   `startDateTime` datetime NOT NULL,
   `endingDateTime` datetime NOT NULL,
@@ -241,8 +240,12 @@ CREATE TABLE `schedule_events` (
   `emailReminder` varchar(50) DEFAULT NULL,
   `appReminder` varchar(100) DEFAULT NULL,
   `reminderTime` int(11) DEFAULT NULL,
-  `isActive` tinyint(1) DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `isActive` tinyint(1) DEFAULT 1,
+  `rsvp_status` ENUM('pending', 'confirmed', 'declined') DEFAULT 'pending' AFTER `isActive`;
+  PRIMARY KEY (`event_id`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `schedule_events`
