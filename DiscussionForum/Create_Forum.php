@@ -1,21 +1,12 @@
 <?php
 // Start session and include header
-session_start();
-
 
 // Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "NIRDAKMS";
-
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
+require_once('../SchedureEvent/connect.php');
+$conn = $connection;
 
 // Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+
 
 // Initialize variables
 $error = '';
@@ -24,10 +15,8 @@ $users = [];
 $groups = [];
 
 // Check if user is logged in (add your own authentication logic)
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
-}
+require_once __DIR__ . '/../Internees_task/auth/auth_check.php'; 
+
 
 // Get users and groups for access control
 // $users_result = $conn->query("SELECT id, username FROM users");

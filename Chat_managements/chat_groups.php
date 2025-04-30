@@ -1,202 +1,248 @@
 <?php
-session_start();
 // Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "NIRDAKMS";
+$host = '127.0.0.1:3307';   // Database server
+$user = 'root';          // Database username
+$pass = '';              // Database password
+$dbname = 'NIRDAKMS';      // Database name
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
 }
 
+session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;  
-}
-
-$userId = $_SESSION['user_id'];
-$username = $_SESSION['username'] ?? 'User';
-
-// Fetch user's private conversations
-$privateChats = [];
-$privateQuery = "SELECT 
-    pc.conversation_id, 
-    CASE 
-        WHEN pc.user1_id = $userId THEN u2.user_id 
-        ELSE u1.user_id 
-    END as other_user_id,
-    CASE 
-        WHEN pc.user1_id = $userId THEN u2.username 
-        ELSE u1.username 
-    END as other_username,
-    CASE 
-        WHEN pc.user1_id = $userId THEN u2.full_name 
-        ELSE u1.full_name 
-    END as other_full_name,
-    m.content as last_message,
-    m.sent_at as last_message_time,
-    us.is_online,
-    us.last_seen
-FROM private_conversations pc
-LEFT JOIN users u1 ON pc.user1_id = u1.user_id
-LEFT JOIN users u2 ON pc.user2_id = u2.user_id
-LEFT JOIN messages m ON m.message_id = (
-    SELECT message_id FROM messages 
-    WHERE (conversation_id = pc.conversation_id)
-    ORDER BY sent_at DESC LIMIT 1
-)
-LEFT JOIN user_status us ON us.user_id = CASE 
-    WHEN pc.user1_id = $userId THEN pc.user2_id 
-    ELSE pc.user1_id 
-END
-WHERE pc.user1_id = $userId OR pc.user2_id = $userId
-ORDER BY m.sent_at DESC";
-$privateResult = mysqli_query($conn, $privateQuery);
-while ($row = mysqli_fetch_assoc($privateResult)) {
-    $privateChats[] = $row;
-}
-
-// Fetch user's group chats
-$groupChats = [];
-$groupQuery = "SELECT 
-    g.group_id,
-    g.group_name,
-    g.description,
-    m.content as last_message,
-    m.sent_at as last_message_time,
-    (SELECT COUNT(*) FROM group_members WHERE group_id = g.group_id) as member_count
-FROM group_members gm
-JOIN chat_groups g ON gm.group_id = g.group_id
-LEFT JOIN messages m ON m.message_id = (
-    SELECT message_id FROM messages 
-    WHERE (group_id = g.group_id)
-    ORDER BY sent_at DESC LIMIT 1
-)
-WHERE gm.user_id = $userId AND g.is_active = 1
-ORDER BY m.sent_at DESC";
-$groupResult = mysqli_query($conn, $groupQuery);
-while ($row = mysqli_fetch_assoc($groupResult)) {
-    $groupChats[] = $row;
-}
-
-// Handle new message submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
-    $content = trim($_POST['message_content']);
-    $chatType = $_POST['chat_type'];
-    $chatId = $_POST['chat_id'];
+// API Endpoints
+if (isset($_GET['action'])) {
+    header('Content-Type: application/json');
     
-    if (!empty($content)) {
-        if ($chatType === 'private') {
-            // Find the conversation ID between current user and the other user
-            $convQuery = "SELECT conversation_id FROM private_conversations 
-                          WHERE (user1_id = $userId AND user2_id = $chatId) 
-                          OR (user2_id = $userId AND user1_id = $chatId)";
-            $convResult = mysqli_query($conn, $convQuery);
-            $convRow = mysqli_fetch_assoc($convResult);
-            $conversationId = $convRow['conversation_id'];
-            
-            // Insert message
-            $insertQuery = "INSERT INTO messages (conversation_id, sender_id, content) 
-                            VALUES ($conversationId, $userId, '$content')";
-            mysqli_query($conn, $insertQuery);
-            
-            // Update conversation last message time
-            $updateQuery = "UPDATE private_conversations 
-                            SET last_message_at = NOW() 
-                            WHERE conversation_id = $conversationId";
-            mysqli_query($conn, $updateQuery);
-        } elseif ($chatType === 'group') {
-            // Insert message to group
-            $insertQuery = "INSERT INTO messages (group_id, sender_id, content) 
-                            VALUES ($chatId, $userId, '$content')";
-            mysqli_query($conn, $insertQuery);
-            
-            // Update group last updated time
-            $updateQuery = "UPDATE chat_groups 
-                            SET updated_at = NOW() 
-                            WHERE group_id = $chatId";
-            mysqli_query($conn, $updateQuery);
+    try {
+        switch ($_GET['action']) {
+            case 'get_user':
+                if (!isset($_GET['user_id'])) {
+                    echo json_encode(['error' => 'User ID required']);
+                    exit;
+                }
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ?");
+                $stmt->execute([$_GET['user_id']]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                echo json_encode($user ?: ['error' => 'User not found']);
+                break;
+                
+            case 'get_chats':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+                
+                // Get private conversations
+                $stmt = $pdo->prepare("
+                    SELECT c.conversation_id, 
+                           CASE WHEN c.user1_id = ? THEN u2.user_id ELSE u1.user_id END as other_user_id,
+                           CASE WHEN c.user1_id = ? THEN u2.full_name ELSE u1.full_name END as name,
+                           CASE WHEN c.user1_id = ? THEN u2.email ELSE u1.email END as email,
+                           'private' as type,
+                           c.last_message_at,
+                           m.content as last_message
+                    FROM private_conversations c
+                    LEFT JOIN users u1 ON c.user1_id = u1.user_id
+                    LEFT JOIN users u2 ON c.user2_id = u2.user_id
+                    LEFT JOIN messages m ON (
+                        m.message_id = (
+                            SELECT message_id FROM messages 
+                            WHERE (conversation_id = c.conversation_id) 
+                            ORDER BY sent_at DESC LIMIT 1
+                        )
+                    )
+                    WHERE c.user1_id = ? OR c.user2_id = ?
+                    ORDER BY c.last_message_at DESC
+                ");
+                $stmt->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+                $privateChats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get group chats
+                $stmt = $pdo->prepare("
+                    SELECT g.group_id, g.group_name as name, g.description, 
+                           'group' as type, g.created_at, g.updated_at,
+                           m.content as last_message,
+                           (SELECT COUNT(*) FROM group_members WHERE group_id = g.group_id) as member_count
+                    FROM chat_groups g
+                    JOIN group_members gm ON g.group_id = gm.group_id
+                    LEFT JOIN messages m ON (
+                        m.message_id = (
+                            SELECT message_id FROM messages 
+                            WHERE (group_id = g.group_id) 
+                            ORDER BY sent_at DESC LIMIT 1
+                        )
+                    )
+                    WHERE gm.user_id = ? AND g.is_active = 1
+                    ORDER BY g.updated_at DESC
+                ");
+                $stmt->execute([$_SESSION['user_id']]);
+                $groupChats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Combine and return
+                $allChats = array_merge($privateChats, $groupChats);
+                echo json_encode($allChats);
+                break;
+                
+            case 'get_messages':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+                
+                if (isset($_GET['conversation_id'])) {
+                    // Private conversation messages
+                    $stmt = $pdo->prepare("
+                        SELECT m.*, u.full_name as sender_name
+                        FROM messages m
+                        JOIN users u ON m.sender_id = u.user_id
+                        WHERE m.conversation_id = ?
+                        ORDER BY m.sent_at ASC
+                    ");
+                    $stmt->execute([$_GET['conversation_id']]);
+                } elseif (isset($_GET['group_id'])) {
+                    // Group messages
+                    $stmt = $pdo->prepare("
+                        SELECT m.*, u.full_name as sender_name
+                        FROM messages m
+                        JOIN users u ON m.sender_id = u.user_id
+                        WHERE m.group_id = ?
+                        ORDER BY m.sent_at ASC
+                    ");
+                    $stmt->execute([$_GET['group_id']]);
+                } else {
+                    echo json_encode(['error' => 'Conversation or group ID required']);
+                    exit;
+                }
+                
+                $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode($messages);
+                break;
+                
+            case 'send_message':
+                if (!isset($_SESSION['user_id']) || !isset($_POST['content'])) {
+                    echo json_encode(['error' => 'Missing parameters']);
+                    exit;
+                }
+                
+                $content = trim($_POST['content']);
+                if (empty($content)) {
+                    echo json_encode(['error' => 'Message content cannot be empty']);
+                    exit;
+                }
+                
+                if (isset($_POST['conversation_id'])) {
+                    // Private message
+                    $stmt = $pdo->prepare("
+                        INSERT INTO messages (conversation_id, sender_id, content, sent_at, status)
+                        VALUES (?, ?, ?, NOW(), 'sent')
+                    ");
+                    $stmt->execute([
+                        $_POST['conversation_id'],
+                        $_SESSION['user_id'],
+                        $content
+                    ]);
+                    
+                    // Update conversation last message time
+                    $stmt = $pdo->prepare("
+                        UPDATE private_conversations 
+                        SET last_message_at = NOW() 
+                        WHERE conversation_id = ?
+                    ");
+                    $stmt->execute([$_POST['conversation_id']]);
+                    
+                } elseif (isset($_POST['group_id'])) {
+                    // Group message
+                    $stmt = $pdo->prepare("
+                        INSERT INTO messages (group_id, sender_id, content, sent_at, status)
+                        VALUES (?, ?, ?, NOW(), 'sent')
+                    ");
+                    $stmt->execute([
+                        $_POST['group_id'],
+                        $_SESSION['user_id'],
+                        $content
+                    ]);
+                    
+                    // Update group last update time
+                    $stmt = $pdo->prepare("
+                        UPDATE chat_groups 
+                        SET updated_at = NOW() 
+                        WHERE group_id = ?
+                    ");
+                    $stmt->execute([$_POST['group_id']]);
+                } else {
+                    echo json_encode(['error' => 'Conversation or group ID required']);
+                    exit;
+                }
+                
+                echo json_encode(['success' => true, 'message_id' => $pdo->lastInsertId()]);
+                break;
+                
+            case 'create_group':
+                if (!isset($_SESSION['user_id']) || !isset($_POST['group_name'])) {
+                    echo json_encode(['error' => 'Missing parameters']);
+                    exit;
+                }
+                
+                $groupName = trim($_POST['group_name']);
+                if (empty($groupName)) {
+                    echo json_encode(['error' => 'Group name cannot be empty']);
+                    exit;
+                }
+                
+                $description = isset($_POST['description']) ? trim($_POST['description']) : '';
+                
+                $pdo->beginTransaction();
+                
+                try {
+                    // Create the group
+                    $stmt = $pdo->prepare("
+                        INSERT INTO chat_groups (group_name, description, created_by, created_at, updated_at)
+                        VALUES (?, ?, ?, NOW(), NOW())
+                    ");
+                    $stmt->execute([
+                        $groupName,
+                        $description,
+                        $_SESSION['user_id']
+                    ]);
+                    $groupId = $pdo->lastInsertId();
+                    
+                    // Add creator as admin member
+                    $stmt = $pdo->prepare("
+                        INSERT INTO group_members (group_id, user_id, joined_at, is_admin)
+                        VALUES (?, ?, NOW(), 1)
+                    ");
+                    $stmt->execute([$groupId, $_SESSION['user_id']]);
+                    
+                    $pdo->commit();
+                    echo json_encode(['success' => true, 'group_id' => $groupId]);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    echo json_encode(['error' => 'Failed to create group: ' . $e->getMessage()]);
+                }
+                break;
+                
+            default:
+                echo json_encode(['error' => 'Invalid action']);
         }
-        
-        // Return success response
-        echo json_encode(['status' => 'success']);
-        exit;
+    } catch (PDOException $e) {
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
     }
-}
-
-// Handle fetching messages for a chat
-if (isset($_GET['fetch_messages'])) {
-    $chatType = $_GET['chat_type'];
-    $chatId = $_GET['chat_id'];
-    $messages = [];
-    
-    if ($chatType === 'private') {
-        // Find conversation ID
-        $convQuery = "SELECT conversation_id FROM private_conversations 
-                      WHERE (user1_id = $userId AND user2_id = $chatId) 
-                      OR (user2_id = $userId AND user1_id = $chatId)";
-        $convResult = mysqli_query($conn, $convQuery);
-        $convRow = mysqli_fetch_assoc($convResult);
-        $conversationId = $convRow['conversation_id'];
-        
-        // Fetch messages
-        $messageQuery = "SELECT m.*, u.username, u.full_name 
-                         FROM messages m
-                         JOIN users u ON m.sender_id = u.user_id
-                         WHERE m.conversation_id = $conversationId
-                         ORDER BY m.sent_at ASC";
-        $messageResult = mysqli_query($conn, $messageQuery);
-        while ($row = mysqli_fetch_assoc($messageResult)) {
-            $messages[] = [
-                'id' => $row['message_id'],
-                'sender_id' => $row['sender_id'],
-                'sender_name' => $row['full_name'],
-                'username' => $row['username'],
-                'content' => $row['content'],
-                'time' => date('h:i A', strtotime($row['sent_at'])),
-                'is_sent' => ($row['sender_id'] == $userId)
-            ];
-        }
-    } elseif ($chatType === 'group') {
-        // Fetch group messages
-        $messageQuery = "SELECT m.*, u.username, u.full_name 
-                         FROM messages m
-                         JOIN users u ON m.sender_id = u.user_id
-                         WHERE m.group_id = $chatId
-                         ORDER BY m.sent_at ASC";
-        $messageResult = mysqli_query($conn, $messageQuery);
-        while ($row = mysqli_fetch_assoc($messageResult)) {
-            $messages[] = [
-                'id' => $row['message_id'],
-                'sender_id' => $row['sender_id'],
-                'sender_name' => $row['full_name'],
-                'username' => $row['username'],
-                'content' => $row['content'],
-                'time' => date('h:i A', strtotime($row['sent_at'])),
-                'is_sent' => ($row['sender_id'] == $userId)
-            ];
-        }
-    }
-    
-    // Return messages as JSON
-    echo json_encode($messages);
     exit;
 }
-?>
 
+// Frontend HTML/JS
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Application - Messages</title>
+    <title>Chat_types Application</title>
     <style>
         /* Your existing CSS styles */
         :root {
@@ -521,7 +567,8 @@ if (isset($_GET['fetch_messages'])) {
     <div class="sidebar">
         <div class="header">
             <h2>Messages</h2>
-            <button id="new-chat-btn">+ New</button>
+            <button id="new-chat-btn">+ New Group</button>
+            <button id="new-private-chat-btn">+ New Private Chat</button>
         </div>
         
         <div class="search-bar">
@@ -532,53 +579,11 @@ if (isset($_GET['fetch_messages'])) {
             <div class="chat-type active" data-type="all">All</div>
             <div class="chat-type" data-type="private">Private</div>
             <div class="chat-type" data-type="group">Group</div>
-            <div class="chat-type" data-type="starred">Starred</div>
         </div>
         
         <div class="chat-list" id="chat-list">
-            <!-- Private chats -->
-            <?php foreach ($privateChats as $chat): ?>
-                <div class="chat-item" data-type="private" data-id="<?= $chat['other_user_id'] ?>">
-                    <div class="chat-avatar">
-                        <?= substr($chat['other_full_name'], 0, 1) ?>
-                        <?php if ($chat['is_online']): ?>
-                            <div class="online-status"></div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-name">
-                            <?= htmlspecialchars($chat['other_full_name']) ?>
-                            <span class="chat-time">
-                                <?= $chat['last_message_time'] ? date('h:i A', strtotime($chat['last_message_time'])) : '' ?>
-                            </span>
-                        </div>
-                        <div class="chat-preview">
-                            <?= htmlspecialchars($chat['last_message'] ?? 'No messages yet') ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-            
-            <!-- Group chats -->
-            <?php foreach ($groupChats as $chat): ?>
-                <div class="chat-item" data-type="group" data-id="<?= $chat['group_id'] ?>">
-                    <div class="chat-avatar group-avatar">
-                        <?= substr($chat['group_name'], 0, 1) ?>
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-name">
-                            <?= htmlspecialchars($chat['group_name']) ?>
-                            <span class="chat-time">
-                                <?= $chat['last_message_time'] ? date('h:i A', strtotime($chat['last_message_time'])) : '' ?>
-                            </span>
-                        </div>
-                        <div class="chat-preview">
-                            <?= htmlspecialchars($chat['last_message'] ?? 'No messages yet') ?>
-                            <span class="chat-members"><?= $chat['member_count'] ?> members</span>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+            <!-- Chat items will be populated by JavaScript -->
+            <div class="loading">Loading chats...</div>
         </div>
     </div>
     
@@ -590,94 +595,242 @@ if (isset($_GET['fetch_messages'])) {
         </div>
     </div>
     
+    <!-- New Group Modal -->
+    <div id="new-group-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:20px; border-radius:8px; width:400px; max-width:90%;">
+            <h2>Create New Group</h2>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px;">Group Name</label>
+                <input type="text" id="group-name" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px;">Description (Optional)</label>
+                <textarea id="group-description" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; height:80px;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="cancel-group" style="padding:8px 15px; background:#ddd; border:none; border-radius:4px;">Cancel</button>
+                <button id="create-group" style="padding:8px 15px; background:#0084ff; color:white; border:none; border-radius:4px;">Create</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
+        // Current user ID (should be set after login)
+        const currentUserId = <?php echo isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'null'; ?>;
+        
+        if (!currentUserId) {
+            alert('Please login first');
+            window.location.href = 'login.php'; // Redirect to login if not authenticated
+        }
+        
         // DOM elements
         const chatList = document.getElementById('chat-list');
         const mainChat = document.getElementById('main-chat');
         const chatTypes = document.querySelectorAll('.chat-type');
+        const newGroupModal = document.getElementById('new-group-modal');
         
-        // Current active chat
+        // Current active chat and filter
         let currentChat = null;
+        let currentFilter = 'all';
         
-        // Initialize chat type filters
-        chatTypes.forEach(type => {
-            type.addEventListener('click', () => {
-                chatTypes.forEach(t => t.classList.remove('active'));
-                type.classList.add('active');
-                filterChats(type.dataset.type);
-            });
-        });
-        
-        // Filter chats by type
-        function filterChats(type) {
-            const allChats = document.querySelectorAll('.chat-item');
-            
-            allChats.forEach(chat => {
-                if (type === 'all') {
-                    chat.style.display = 'flex';
-                } else if (type === 'starred') {
-                    // Implement starred functionality if needed
-                    chat.style.display = 'none';
-                } else {
-                    chat.style.display = chat.dataset.type === type ? 'flex' : 'none';
+        // Fetch chats from server
+        async function fetchChats() {
+            try {
+                const response = await fetch('chat_groups.php?action=get_chats');
+                const chats = await response.json();
+                
+                if (chats.error) {
+                    throw new Error(chats.error);
                 }
-            });
+                
+                return chats;
+            } catch (error) {
+                console.error('Error fetching chats:', error);
+                chatList.innerHTML = `<div class="error">${error.message}</div>`;
+                return [];
+            }
         }
         
-        // Handle chat selection
-        chatList.addEventListener('click', (e) => {
-            const chatItem = e.target.closest('.chat-item');
-            if (!chatItem) return;
+        // Fetch messages for a chat
+        async function fetchMessages(chat) {
+            try {
+                let url;
+                if (chat.type === 'private') {
+                    url = `chat_groups.php?action=get_messages&conversation_id=${chat.conversation_id}`;
+                } else {
+                    url = `chat_groups.php?action=get_messages&group_id=${chat.group_id}`;
+                }
+                
+                const response = await fetch(url);
+                const messages = await response.json();
+                
+                if (messages.error) {
+                    throw new Error(messages.error);
+                }
+                
+                return messages;
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+                return [];
+            }
+        }
+        
+        // Send a message
+        async function sendMessage(chat, content) {
+            try {
+                const formData = new FormData();
+                formData.append('content', content);
+                
+                let url;
+                if (chat.type === 'private') {
+                    formData.append('conversation_id', chat.conversation_id);
+                    url = 'chat_groups.php?action=send_message';
+                } else {
+                    formData.append('group_id', chat.group_id);
+                    url = 'chat_groups.php?action=send_message';
+                }
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Error sending message:', error);
+                return { error: error.message };
+            }
+        }
+        
+        // Create a new group
+        async function createGroup(name, description) {
+            try {
+                const formData = new FormData();
+                formData.append('group_name', name);
+                formData.append('description', description);
+                
+                const response = await fetch('chat_groups.php?action=create_group', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Error creating group:', error);
+                return { error: error.message };
+            }
+        }
+
+
+        // Add to your existing script
+document.getElementById('new-private-chat-btn').addEventListener('click', async () => {
+    const username = prompt("Enter username to chat with:");
+    if (username) {
+        try {
+            const response = await fetch('chat_groups.php?action=start_private_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            const result = await response.json();
             
-            // Highlight selected chat
+            if (result.error) throw new Error(result.error);
+            renderChatList(); // Refresh chat list
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+});
+        
+        // Render chat list
+        async function renderChatList(filter = 'all') {
+            chatList.innerHTML = '<div class="loading">Loading chats...</div>';
+            
+            try {
+                const chats = await fetchChats();
+                
+                if (chats.length === 0) {
+                    chatList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--light-text);">No chats found</div>';
+                    return;
+                }
+                
+                const filteredChats = chats.filter(chat => {
+                    if (filter === 'all') return true;
+                    return chat.type === filter;
+                });
+                
+                chatList.innerHTML = '';
+                
+                filteredChats.forEach(chat => {
+                    const chatItem = document.createElement('div');
+                    chatItem.className = 'chat-item';
+                    chatItem.dataset.id = chat.type === 'private' ? `private_${chat.conversation_id}` : `group_${chat.group_id}`;
+                    
+                    // Use default avatar if none provided
+                    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=random`;
+                    
+                    chatItem.innerHTML = `
+                        <div class="chat-avatar">
+                            <img src="${avatar}" alt="${chat.name}">
+                        </div>
+                        <div class="chat-info">
+                            <div class="chat-name">
+                                ${chat.name}
+                                <span class="chat-time">${formatTime(chat.last_message_at || chat.updated_at || chat.created_at)}</span>
+                            </div>
+                            <div class="chat-preview">
+                                ${chat.last_message ? truncate(chat.last_message, 30) : 'No messages yet'}
+                                ${chat.type === 'group' ? `<small>(${chat.member_count || 0} members)</small>` : ''}
+                            </div>
+                        </div>
+                    `;
+                    
+                    chatItem.addEventListener('click', () => renderChat(chat));
+                    chatList.appendChild(chatItem);
+                });
+            } catch (error) {
+                chatList.innerHTML = `<div class="error">${error.message}</div>`;
+            }
+        }
+        
+        // Render a specific chat
+        async function renderChat(chat) {
+            currentChat = chat;
+            
+            // Highlight selected chat in list
             document.querySelectorAll('.chat-item').forEach(item => {
                 item.classList.remove('active');
+                if (item.dataset.id === (chat.type === 'private' ? `private_${chat.conversation_id}` : `group_${chat.group_id}`)) {
+                    item.classList.add('active');
+                }
             });
-            chatItem.classList.add('active');
             
-            // Set current chat
-            currentChat = {
-                type: chatItem.dataset.type,
-                id: chatItem.dataset.id
-            };
-            
-            // Load chat messages
-            loadChatMessages(currentChat.type, currentChat.id);
-        });
-        
-        // Load messages for a specific chat
-        function loadChatMessages(chatType, chatId) {
-            fetch(`chat_groups.php?fetch_messages=1&chat_type=${chatType}&chat_id=${chatId}`)
-                .then(response => response.json())
-                .then(messages => {
-                    renderChat(chatType, chatId, messages);
-                })
-                .catch(error => {
-                    console.error('Error loading messages:', error);
-                });
-        }
-        
-        // Render chat with messages
-        function renderChat(chatType, chatId, messages) {
-            // Get chat info from the clicked item
-            const chatItem = document.querySelector(`.chat-item[data-id="${chatId}"]`);
-            if (!chatItem) return;
-            
-            const chatName = chatItem.querySelector('.chat-name').textContent.split('\n')[0].trim();
-            const isOnline = chatItem.querySelector('.online-status') !== null;
-            const memberCount = chatItem.querySelector('.chat-members')?.textContent || '';
+            // Load messages
+            const messages = await fetchMessages(chat);
             
             // Render chat header
+            const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=random`;
+            
             let headerHTML = `
                 <div class="chat-avatar">
-                    ${chatItem.querySelector('.chat-avatar').innerHTML}
+                    <img src="${avatar}" alt="${chat.name}">
                 </div>
                 <div class="chat-header-info">
-                    <div class="chat-header-name">${chatName}</div>
+                    <div class="chat-header-name">${chat.name}</div>
                     <div class="chat-header-status">
-                        ${chatType === 'private' ? 
-                            (isOnline ? 'Online' : 'Offline') : 
-                            memberCount}
+                        ${chat.type === 'private' ? chat.email : `${chat.member_count || 0} members`}
                     </div>
                 </div>
             `;
@@ -685,23 +838,20 @@ if (isset($_GET['fetch_messages'])) {
             // Render messages
             let messagesHTML = '';
             messages.forEach(message => {
+                const isSent = message.sender_id == currentUserId;
+                const senderName = isSent ? 'You' : (message.sender_name || 'Unknown');
+                
                 messagesHTML += `
-                    <div class="message ${message.is_sent ? 'sent' : 'received'}">
-                        ${chatType === 'group' && !message.is_sent ? 
-                            `<div style="font-size: 12px; margin-bottom: 2px;">${message.sender_name}</div>` : ''}
+                    <div class="message ${isSent ? 'sent' : 'received'}">
+                        ${!isSent && chat.type === 'group' ? `<div style="font-size: 12px; margin-bottom: 2px;">${senderName}</div>` : ''}
                         <div class="message-content">${message.content}</div>
                         <div class="message-time">
-                            ${message.time}
-                            ${message.is_sent ? '<span class="message-status">✓✓</span>' : ''}
+                            ${formatTime(message.sent_at)}
+                            ${isSent ? `<span class="message-status">${message.status === 'read' ? '✓✓' : '✓'}</span>` : ''}
                         </div>
                     </div>
                 `;
             });
-            
-            // Add typing indicator if online
-            if (isOnline && chatType === 'private') {
-                messagesHTML += `<div class="typing-indicator">${chatName} is typing...</div>`;
-            }
             
             // Render input area
             let inputHTML = `
@@ -730,42 +880,97 @@ if (isset($_GET['fetch_messages'])) {
             const sendButton = document.getElementById('send-button');
             const inputField = document.getElementById('message-input');
             
-            function sendMessage() {
+            sendButton.addEventListener('click', async () => {
                 const messageContent = inputField.value.trim();
-                if (messageContent && currentChat) {
-                    fetch('chat_groups.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `message_content=${encodeURIComponent(messageContent)}&chat_type=${currentChat.type}&chat_id=${currentChat.id}`
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            inputField.value = '';
-                            loadChatMessages(currentChat.type, currentChat.id);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error sending message:', error);
-                    });
-                }
-            }
-            
-            sendButton.addEventListener('click', sendMessage);
-            
-            inputField.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
+                if (messageContent) {
+                    const result = await sendMessage(chat, messageContent);
+                    if (!result.error) {
+                        // Refresh the chat view
+                        await renderChat(chat);
+                        // Refresh the chat list to update last message
+                        renderChatList(currentFilter);
+                    }
+                    inputField.value = '';
+                    inputField.focus();
                 }
             });
+            
+            // Also send on Enter key
+            inputField.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendButton.click();
+                }
+            });
+            
+            inputField.focus();
         }
         
-        // New chat button functionality
-        document.getElementById('new-chat-btn').addEventListener('click', () => {
-            alert('New chat functionality would be implemented here');
+        // Helper function to format time
+        function formatTime(dateString) {
+            if (!dateString) return '';
+            
+            const date = new Date(dateString);
+            const now = new Date();
+            
+            if (date.toDateString() === now.toDateString()) {
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (date.toDateString() === yesterday.toDateString()) {
+                return 'Yesterday';
+            }
+            
+            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+        
+        // Helper function to truncate text
+        function truncate(text, length) {
+            return text.length > length ? text.substring(0, length) + '...' : text;
+        }
+        
+        // Initialize chat type filters
+        chatTypes.forEach(type => {
+            type.addEventListener('click', () => {
+                chatTypes.forEach(t => t.classList.remove('active'));
+                type.classList.add('active');
+                currentFilter = type.dataset.type;
+                renderChatList(currentFilter);
+            });
         });
+        
+        // New group button functionality
+        document.getElementById('new-chat-btn').addEventListener('click', () => {
+            newGroupModal.style.display = 'flex';
+        });
+        
+        document.getElementById('cancel-group').addEventListener('click', () => {
+            newGroupModal.style.display = 'none';
+        });
+        
+        document.getElementById('create-group').addEventListener('click', async () => {
+            const name = document.getElementById('group-name').value.trim();
+            const description = document.getElementById('group-description').value.trim();
+            
+            if (!name) {
+                alert('Group name is required');
+                return;
+            }
+            
+            const result = await createGroup(name, description);
+            if (result.error) {
+                alert(result.error);
+            } else {
+                newGroupModal.style.display = 'none';
+                document.getElementById('group-name').value = '';
+                document.getElementById('group-description').value = '';
+                renderChatList(currentFilter);
+            }
+        });
+        
+        // Initialize with all chats
+        renderChatList();
     </script>
 </body>
 </html>

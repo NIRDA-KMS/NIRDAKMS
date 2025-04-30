@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../SchedureEvent/connect.php'; // Include your database connection file
+require_once __DIR__ . '/../../SchedureEvent/connect.php';  // Include your database connection file
 
 $error = '';
 $success = '';
