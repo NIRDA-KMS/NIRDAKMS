@@ -1,8 +1,212 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
+include('../SchedureEvent/connect.php');
+
+// Database connection
+if (!$connection) {
+    die("Database connection failed");
+}
+
+// Handle AJAX requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Handle task creation
+    if (isset($_POST['create_task'])) {
+        $title = $_POST['title'] ?? '';
+        $description = $_POST['description'] ?? '';
+        $priority = $_POST['priority'] ?? 'medium';
+        $status = $_POST['status'] ?? 'backlog';
+        $assignee_id = $_POST['assignee_id'] ?? null;
+        $deadline = $_POST['deadline'] ?? null;
+
+        if (!empty($title)) {
+            $stmt = $connection->prepare("INSERT INTO tasks (title, description, status, priority, assignee_id, deadline) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssis", $title, $description, $status, $priority, $assignee_id, $deadline);
+            
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Task created successfully!']);
+            } else {
+                echo json_encode(['success' => false, 'message' => "Error creating task: " . $stmt->error]);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['success' => false, 'message' => "Title is required"]);
+        }
+        exit();
+    }
+
+    // Handle file upload
+    if (isset($_FILES['file'])) {
+        header('Content-Type: application/json');
+        
+        try {
+            $file = $_FILES['file'];
+            $uploadDir = 'storage/';
+            $allowedTypes = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'application/pdf' => 'pdf',
+                'text/plain' => 'txt',
+                'application/msword' => 'doc',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx'
+            ];
+            $maxFileSize = 10 * 1024 * 1024; // 10MB
+
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // Check for upload errors
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception(match($file['error']) {
+                    UPLOAD_ERR_INI_SIZE => "File exceeds server's upload_max_filesize",
+                    UPLOAD_ERR_FORM_SIZE => "File exceeds form's MAX_FILE_SIZE",
+                    UPLOAD_ERR_PARTIAL => "File was only partially uploaded",
+                    UPLOAD_ERR_NO_FILE => "No file was uploaded",
+                    UPLOAD_ERR_NO_TMP_DIR => "Missing temporary folder",
+                    UPLOAD_ERR_CANT_WRITE => "Failed to write file to disk",
+                    UPLOAD_ERR_EXTENSION => "File upload stopped by PHP extension",
+                    default => "Unknown upload error"
+                });
+            }
+            
+            // Validate file type
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $fileType = $finfo->file($file['tmp_name']);
+            if (!array_key_exists($fileType, $allowedTypes)) {
+                throw new Exception("File type not allowed. Allowed types: JPG, PNG, PDF, TXT, DOC, DOCX");
+            }
+            
+            // Validate file size
+            if ($file['size'] > $maxFileSize) {
+                throw new Exception("File size exceeds maximum allowed (10MB).");
+            }
+            
+            // Sanitize filename
+            $originalName = basename($file['name']);
+            $extension = $allowedTypes[$fileType];
+            $safeName = uniqid() . '.' . $extension;
+            $destination = $uploadDir . $safeName;
+            
+            // Move uploaded file to storage
+            if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                throw new Exception("Failed to move uploaded file.");
+            }
+            
+            // Store file info in database
+            $stmt = $connection->prepare("INSERT INTO files (filename, filepath, size, type) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssis", $originalName, $destination, $file['size'], $fileType);
+            
+            if ($stmt->execute()) {
+                $fileId = $stmt->insert_id;
+                $stmt->close();
+                
+                // Get the newly uploaded file to return as JSON
+                $stmt = $connection->prepare("SELECT id, filename, filepath, size, type FROM files WHERE id = ?");
+                $stmt->bind_param("i", $fileId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $newFile = $result->fetch_assoc();
+                $stmt->close();
+                
+                // Format the file data
+                $formattedFile = [
+                    'id' => $newFile['id'],
+                    'name' => $newFile['filename'],
+                    'path' => $newFile['filepath'],
+                    'size' => formatSizeUnits($newFile['size']),
+                    'type' => $newFile['type'],
+                    'uploaded' => date('M j, Y'),
+                    'ext' => strtolower(pathinfo($newFile['filename'], PATHINFO_EXTENSION))
+                ];
+                
+                // echo json_encode([
+                //     'success' => true,
+                //     'message' => 'File uploaded successfully!',
+                //     'file' => $formattedFile
+                // ]);
+            } else {
+                throw new Exception("Failed to save file information to database.");
+            }
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'File upload error: ' . $e->getMessage()
+            ]);
+        }
+        exit();
+    }
+}
+
+// Get all tasks
+$tasks = [];
+$result = $connection->query("SELECT * FROM tasks ORDER BY FIELD(status, 'backlog', 'todo', 'in_progress', 'done'), deadline");
+if ($result) {
+    $tasks = $result->fetch_all(MYSQLI_ASSOC);
+    $result->free();
+}
+
+// Get team members
+$team_members = [];
+try {
+    $query = "SELECT u.user_id, u.full_name, pm.role FROM users u JOIN project_members pm ON u.user_id = pm.user_id";
+    $stmt = $connection->prepare($query);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $team_members[] = [
+                'id' => $row['user_id'],
+                'name' => $row['full_name'],
+                'role' => $row['role']
+            ];
+        }
+    }
+    $stmt->close();
+} catch (Exception $e) {
+    error_log("Database error: " . $e->getMessage());
+}
+
+// Calculate project progress
+$total_tasks = count($tasks);
+$completed_tasks = 0;
+foreach ($tasks as $task) {
+    if ($task['status'] === 'done') {
+        $completed_tasks++;
+    }
+}
+$progress = $total_tasks > 0 ? round(($completed_tasks / $total_tasks) * 100) : 0;
+
+// Get files from database
+$files = [];
+try {
+    $query = "SELECT id, filename, filepath, size, type, uploaded_at FROM files ORDER BY uploaded_at DESC";
+    $result = $connection->query($query);
+    while ($row = $result->fetch_assoc()) {
+        $files[] = [
+            'id' => $row['id'],
+            'name' => $row['filename'],
+            'path' => $row['filepath'],
+            'size' => formatSizeUnits($row['size']),
+            'type' => $row['type'],
+            'uploaded' => date('M j, Y', strtotime($row['uploaded_at']))
+        ];
+    }
+} catch (Exception $e) {
+    error_log("Database error: " . $e->getMessage());
+}
+
+function formatSizeUnits($bytes) {
+    if ($bytes >= 1073741824) {
+        return number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        return number_format($bytes / 1024, 2) . ' KB';
+    } elseif ($bytes > 1) {
+        return $bytes . ' bytes';
+    } elseif ($bytes == 1) {
+        return $bytes . ' byte';
+    }
+    return '0 bytes';
 }
 ?>
 <!DOCTYPE html>
@@ -10,316 +214,601 @@ if (!isset($_SESSION['user_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forum Management System</title>
-    <script src="https://cdn.tiny.cloud/1/yy21cxb9sz8dz5s1jswqcenpziyj0y4frg79dtifqqamfxbf/tinymce/7/tinymce.min.js" referrerpolicy="origin"></script>
+    <title>Project Management Dashboard</title>
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SortableJS for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
     <style>
-           /* Reset and Base Styles */
-           * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+/* File Repository Styles */
+.file-repository {
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+}
 
+.file-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.file-upload {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #f8f9fa;
+    padding: 12px 20px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.file-upload:hover {
+    background: #e9ecef;
+}
+
+.file-upload input[type="file"] {
+    display: none;
+}
+
+.file-upload label {
+    background: #007bff;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-block;
+}
+
+.file-upload label:hover {
+    background: #0069d9;
+}
+
+.file-upload button {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.file-upload button:hover {
+    background: #218838;
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.file-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 18px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.file-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border-color: #007bff;
+}
+
+.file-icon {
+    font-size: 42px;
+    text-align: center;
+    margin-bottom: 15px;
+    color: #6c757d;
+}
+
+.file-icon.pdf { color: #e74c3c; }
+.file-icon.image { color: #3498db; }
+.file-icon.doc { color: #2c3e50; }
+.file-icon.xls { color: #27ae60; }
+.file-icon.zip { color: #f39c12; }
+.file-icon.other { color: #9b59b6; }
+
+.file-name {
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    margin-top: auto;
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.file-meta div {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.file-meta i {
+    margin-right: 8px;
+    width: 18px;
+    text-align: center;
+    color: #adb5bd;
+}
+
+.file-actions-bottom {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.file-download {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.3s;
+}
+
+.file-download:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.file-delete {
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.3s;
+}
+
+.file-delete:hover {
+    color: #c82333;
+}
+
+.upload-message {
+    padding: 12px 15px;
+    border-radius: 4px;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.upload-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.upload-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    
+    .file-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .file-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .file-upload {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+
+        /* Your existing CSS styles here */
+
+
+         /* Base Styles */
+         :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --light-gray: #ecf0f1;
+            --dark-gray: #7f8c8d;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0%px;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
+            line-height: 1.6;
+            background-color: #f5f7fa;
             color: #333;
-            
-            width: 100%;
-            padding-top: 60px; /* Adjust based on your header's fixed height */
-            
+            padding-top: 1500px;
         }
-
-        /*Layout Styles */
-         .main-container {
-            
-            margin: 80px auto 20px auto;   /*Adjust top margin to be greater than padding-top  */
-            padding: 0 15px; 
-             padding-left: 25px;
-            margin-left: 255px;
+        
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-top: 100px;
             margin-right: 100px;
-            padding-right: 100px;
-            margin-bottom: 100px;
-        }   
-
-        .forum-layout {
-            display: inline-block;
-            width: 1000px;
-            grid-template-columns: 250px 1fr;
-            gap: 20px;
-            bottom: -20 px;
+            margin-bottom: 50px;
         }
-
-        /* Sidebar Styles */
-        .sidebar {
-            background-color: #fff;
-            border-radius: 5px;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .category-list h3 {
-            padding: 8px;
-            background: #2c3e50;
-            color: #fff;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-
-        .category-list ul {
-            list-style: none;
-        }
-
-        .category-list li {
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-
-        .category-list a {
-            color: #3498db;
-            text-decoration: none;
-        transition: color 0.3s;
-
-        }
-
-        .category-list a:hover {
-            color: #1a6ea0;
-        }
-
-        .forum-stats {
-            margin-top: 20px;
-        }
-
-        .forum-stats h3 {
-            padding: 8px;
-            background: #2c3e50;
-            color: #fff;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-
-        .forum-stats p {
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        /* Main Content Styles */
-        .main-content {
-            background-color: #fff;
-            border-radius: 5px;
-            padding: 90px;
-             
-            
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .topic-list-header {
+        
+        /* Header */
+        .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
         }
-
-        .topic-list-header h2 {
-            font-size: 20px;
-            color: #2c3e50;
+        
+        .project-title {
+            font-size: 24px;
+            color: var(--secondary-color);
         }
-
-        /* Button Styles */
+        
+        .project-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
         .btn {
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
+            padding: 8px 16px;
             border: none;
+            border-radius: 4px;
             font-weight: 500;
+            cursor: pointer;
             transition: all 0.3s;
         }
-
+        
         .btn-primary {
-            background-color: #3498db;
-            color: #fff;
+            background: var(--primary-color);
+            color: white;
         }
-
+        
         .btn-primary:hover {
-            background-color: #2980b9;
+            background: #2980b9;
         }
-
+        
         .btn-secondary {
-            background-color: #95a5a6;
-            color: #fff;
+            background: var(--light-gray);
+            color: var(--secondary-color);
         }
-
+        
         .btn-secondary:hover {
-            background-color: #7f8c8d;
+            background: #ddd;
         }
-
-        .btn-danger {
-            background-color: #e74c3c;
-            color: #fff;
+        
+        /* Dashboard Layout */
+        .dashboard-grid {
+            display: flex;
+            /* grid-template-columns: 300px 1fr; */
+            gap: 20px;
         }
-
-        .btn-danger:hover {
-            background-color: #c0392b;
+        
+        /* Sidebar */
+        .sidebar {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-
-        .create-topic-btn,
-        .review-report-btn {
-            /* You might need to adjust this if your header has specific button styles */
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-            font-weight: 500;
-            transition: all 0.3s;
-            background-color: #3498db;
-            color: #fff;
+        
+        .sidebar-section {
+            margin-bottom: 25px;
         }
-
-        .review-report-btn {
-            margin-top: 20px;
-        }
-
-        /* Topic Item Styles */
-        .topic-item {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            position: relative;
-            transition: background-color 0.3s;
-        }
-
-        .topic-item:hover {
-            background-color: #f9f9f9;
-        }
-
-        .topic-title {
+        
+        .sidebar-title {
             font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 5px;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
         }
-
-        .topic-meta {
-            font-size: 13px;
-            color: #7f8c8d;
-            margin-bottom: 5px;
+        
+        /* Project Overview */
+        .project-meta {
+            margin-bottom: 15px;
         }
-
-        .topic-stats {
+        
+        .meta-item {
             display: flex;
-            gap: 15px;
-            font-size: 13px;
-            color: #7f8c8d;
-        }
-
-        .pinned-badge {
-            background-color: #2ecc71;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 12px;
-            margin-left: 10px;
-            display: inline-block;
-        }
-
-        .mod-controls {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .mod-btn {
-            background: none;
-            border: none;
-            color: #7f8c8d;
-            cursor: pointer;
+            justify-content: space-between;
+            margin-bottom: 8px;
             font-size: 14px;
-            transition: color 0.3s;
         }
-
-        .mod-btn:hover {
-            color: #3498db;
+        
+        .meta-label {
+            color: var(--dark-gray);
+            font-weight: 500;
         }
-
-        /* Status Toggle Styles */
-        .status-toggle {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 12px;
+        
+        .progress-container {
+            margin: 15px 0;
         }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 40px;
-            height: 20px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .subscription-controls {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        .subscribe-btn, .unsubscribe-btn {
-            padding: 8px 15px;
+        
+        .progress-bar {
+            height: 8px;
+            background: #eee;
             border-radius: 4px;
-            cursor: pointer;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 65%; /* Dynamic value */
+        }
+        
+        /* Activity Feed */
+        .activity-item {
+            display: flex;
+            margin-bottom: 15px;
             font-size: 14px;
         }
-        .subscribe-btn {
-            background-color: #2ecc71;
-            color: white;
-            border: none;
-        }
-        .unsubscribe-btn {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: 0.4s;
-            border-radius: 20px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            left: 2px;
-            bottom: 2px;
-            background-color: #fff;
-            transition: 0.4s;
+        
+        .activity-avatar {
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
+            background: #ddd;
+            margin-right: 10px;
+            flex-shrink: 0;
         }
-
-        input:checked + .slider {
-            background-color: #2ecc71;
+        
+        .activity-content {
+            flex-grow: 1;
         }
-
-        input:checked + .slider:before {
-            transform: translateX(20px);
+        
+        .activity-time {
+            color: var(--dark-gray);
+            font-size: 12px;
+            margin-top: 3px;
         }
-
-        /* Modal Styles */
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+            gap: 20px;
+        }
+        
+        /* Kanban Board */
+        .kanban-board {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .kanban-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .kanban-columns {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        
+        .kanban-column {
+            background: var(--light-gray);
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 400px;
+        }
+        
+        .column-header {
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .task-count {
+            background: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        
+        .task-list {
+            min-height: 300px;
+        }
+        
+        .task-card {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        
+        .task-card:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
+        
+        .task-priority {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .priority-high {
+            background: var(--accent-color);
+        }
+        
+        .priority-medium {
+            background: var(--warning-color);
+        }
+        
+        .priority-low {
+            background: var(--success-color);
+        }
+        
+        .task-title {
+            font-weight: 500;
+            margin: 5px 0;
+        }
+        
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--dark-gray);
+            margin-top: 8px;
+        }
+        
+        .task-assignee {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ddd;
+        }
+        
+        /* File Repository */
+        .file-repository {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .file-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .file-upload {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-upload input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .file-card {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+        
+        .file-card:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .file-icon {
+            font-size: 36px;
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-meta {
+            font-size: 12px;
+            color: var(--dark-gray);
+        }
+        
+        /* Project Timeline */
+        .project-timeline {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .gantt-chart {
+            width: 100%;
+            height: 400px;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-top: 15px;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        /* Reporting */
+        .reporting-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 15px;
+        }
+        
+        /* Modals */
         .modal {
             display: none;
             position: fixed;
@@ -327,1084 +816,569 @@ if (!isset($_SESSION['user_id'])) {
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000; /* Ensure it's below the header's z-index if the header is fixed and has a higher z-index */
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
             justify-content: center;
             align-items: center;
         }
-
+        
         .modal-content {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 5px;
+            background: white;
+            border-radius: 8px;
             width: 90%;
-            max-width: 800px;
+            max-width: 600px;
             max-height: 90vh;
             overflow-y: auto;
+            padding: 25px;
         }
-
-        .modal h2 {
-            color: #2c3e50;
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
-            font-size: 22px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
         }
-
-        /* Form Styles */
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .form-group input[type="text"],
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .form-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        /* Reply Styles */
-        .reply {
-            margin-left: 30px;
-            padding: 10px;
-            border-left: 2px solid #eee;
-            margin-bottom: 15px;
-        }
-
-        .reply-content {
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-
-        .reply-meta {
-            font-size: 12px;
-            color: #7f8c8d;
-            margin-bottom: 5px;
-        }
-
-        .flag-btn {
+        
+        .close-modal {
             background: none;
             border: none;
-            color: #e74c3c;
+            font-size: 24px;
             cursor: pointer;
-            font-size: 12px;
-            margin-left: 10px;
-            transition: color 0.3s;
+            color: var(--dark-gray);
         }
-
-        .flag-btn:hover {
-            color: #c0392b;
-        }
-
-        .flag-form {
-            display: none;
-            padding: 10px;
-            background: #fff5f5;
-            margin-top: 5px;
-            border-radius: 4px;
-        }
-
-        /* State Styles */
-        .flagged {
-            border-left: 3px solid #e74c3c;
-            background-color: #fff5f5;
-        }
-
-        .deactivated {
-            opacity: 0.6;
-            background-color: #f9f9f9;
-            border-left: 3px solid #95a5a6;
-        }
-
-        /* Admin Panel Styles */
-        .admin-tabs {
-            display: flex;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 15px;
-        }
-
-        .admin-tab {
-            padding: 8px 15px;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            font-weight: 500;
-            color: #7f8c8d;
-            transition: all 0.3s;
-        }
-
-        .admin-tab.active {
-            color: #3498db;
-            border-bottom-color: #3498db;
-        }
-
-        .admin-tab-content {
-            display: none;
-        }
-
-        .admin-tab-content.active {
-            display: block;
-        }
-
-        .flagged-item {
-            padding: 15px;
-            margin-bottom: 15px;
-            border-left: 3px solid #e74c3c;
-            background-color: #fff5f5;
-            border-radius: 4px;
-        }
-
-        .flagged-item p {
-            margin-bottom: 8px;
-        }
-
-        .admin-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        /* Responsive Styles */
-        @media (max-width: 768px) {
-            .forum-layout {
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
                 grid-template-columns: 1fr;
             }
-
-            .mod-controls {
-                position: static;
-                margin-top: 10px;
-                justify-content: flex-end;
+            
+            .kanban-columns {
+                grid-template-columns: repeat(2, 1fr);
             }
-
-            .reply {
-                margin-left: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .kanban-columns {
+                grid-template-columns: 1fr;
             }
-
-            .admin-actions {
-                flex-direction: column;
+            
+            .file-grid {
+                grid-template-columns: 1fr 1fr;
             }
         }
     </style>
 </head>
 <body>
-<?php include('../Internees_task/header.php') ?>
-    
-    <div class="main-container">
-        <div class="forum-layout">
-            <aside class="sidebar">
-                <div class="category-list">
-                    <h3>Categories</h3>
-                    <ul id="categoryList">
-                        <!-- Categories will be loaded via API -->
-                    </ul>
-                </div>
-                
-                <div class="forum-stats">
-                    <h3>Forum Statistics</h3>
-                    <p>Topics: <span id="topicCount">0</span></p>
-                    <p>Posts: <span id="postCount">0</span></p>
-                    <p>Members: <span id="memberCount">0</span></p>
-                </div>
-            </aside>
-            
-            <main class="main-content">
-                <div class="topic-list-header">
-                    <h2 style="padding-left: 200px;">Manage Forums</h2>
-                    <button class="btn btn-primary" id="createTopicBtn">Create New Topic</button>
-                </div>
-                
-                <div class="topic-list" id="topicList">
-                    <!-- Topics will be loaded via API -->
-                </div>
+<?php include("../Internees_task/header.php"); ?>
 
-                <div id="moderationControls" style="display: none;">
-                    <button class="btn btn-primary review-report-btn" id="reviewReports">
-                        Review Reports
-                    </button>
-                </div>
-            </main>
+<!-- Display messages -->
+<?php if (isset($_SESSION['message'])): ?>
+    <div class="alert alert-success"><?php echo $_SESSION['message']; unset($_SESSION['message']); ?></div>
+<?php endif; ?>
+<?php if (isset($_SESSION['error'])): ?>
+    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
+<?php endif; ?>
+
+<div class="container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1 class="project-title">Website Redesign Project</h1>
+        <div class="project-actions">
+            <button class="btn btn-secondary">Export Report</button>
+            <button class="btn btn-primary">Share Project</button>
         </div>
     </div>
     
-    <!-- Create Topic Modal -->
-    <div class="modal" id="createTopicModal">
-        <div class="modal-content">
-            <h2>Create New Topic</h2>
-            <form id="topicForm">
-                <div class="form-group">
-                    <label for="topicCategory">Category</label>
-                    <select id="topicCategory">
-                        <option value="">Select a category</option>
-                        <!-- Categories will be loaded via API -->
-                    </select>
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Project Overview -->
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Project Overview</h3>
+                <div class="project-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Status:</span>
+                        <span>In Progress</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Start Date:</span>
+                        <span>Jun 15, 2023</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">End Date:</span>
+                        <span>Sep 30, 2023</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Completion:</span>
+                        <span><?php echo $progress; ?>%</span>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="topicTitle">Title</label>
-                    <input type="text" id="topicTitle" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="topicContent">Content</label>
-                    <textarea id="topicContent" style="height: 300px;"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="cancelTopic">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Topic</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Topic View Modal -->
-    <div class="modal" id="topicViewModal">
-        <div class="modal-content">
-            <div class="topic-header">
-                <h2 id="viewTopicTitle"></h2>
-                <div class="topic-meta" id="viewTopicMeta"></div>
-            </div>
-            
-            <div class="topic-content" id="viewTopicContent" style="margin: 20px 0;"></div>
-            
-            <div class="topic-replies" id="topicReplies">
-                <h3>Replies</h3>
-                <!-- Replies will be loaded via API -->
-            </div>
-            
-            <div class="reply-form" style="margin-top: 20px;">
-                <h3>Post a Reply</h3>
-                <textarea id="replyContent" style="width: 100%; height: 150px; margin-bottom: 10px;"></textarea>
-                <button class="btn btn-primary" id="submitReply">Post Reply</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Admin Panel Modal -->
-    <div class="modal" id="reviewReportsModal">
-        <div class="modal-content">
-            <h2>Admin Review Reports</h2>
-            
-            <div class="admin-tabs">
-                <button class="admin-tab active" data-tab="flagged">Flagged Content</button>
-                <button class="admin-tab" data-tab="users">User Management</button>
-                <button class="admin-tab" data-tab="categories">Categories</button>
-            </div>
-            
-            <div class="admin-tab-content active" id="flaggedContent" style="margin-top: 20px;">
-                <h3>Flagged Posts <span id="flag-count">(0)</span></h3>
-                <div class="flagged-posts-list" id="flaggedPostsList">
-                    <!-- Flagged posts will be loaded via API -->
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
+                    </div>
                 </div>
             </div>
             
-            <div class="admin-tab-content" id="usersContent" style="margin-top: 20px;">
-                <h3>User Management</h3>
-                <div id="userManagementContent">
-                    <!-- User management content will be loaded here -->
+            <!-- Team Members -->
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Team Members</h3>
+                <div class="team-members">
+                    <?php foreach ($team_members as $member): ?>
+                        <div class="activity-item">
+                            <div class="activity-avatar" style="background-color: #<?php echo substr(md5($member['id']), 0, 6); ?>"></div>
+                            <div class="activity-content">
+                                <strong><?php echo htmlspecialchars($member['name']); ?></strong> (<?php echo htmlspecialchars($member['role']); ?>)
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
             
-            <div class="admin-tab-content" id="categoriesContent" style="margin-top: 20px;">
-                <h3>Category Management</h3>
-                <div id="categoryManagementContent">
-                    <!-- Category management content will be loaded here -->
+            <!-- Recent Activity -->
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Recent Activity</h3>
+                <div class="activity-feed">
+                    <div class="activity-item">
+                        <div class="activity-avatar" style="background-color: #<?php echo substr(md5(2), 0, 6); ?>"></div>
+                        <div class="activity-content">
+                            <strong>John Smith</strong> completed task "Homepage layout"
+                            <div class="activity-time">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-avatar" style="background-color: #<?php echo substr(md5(3), 0, 6); ?>"></div>
+                        <div class="activity-content">
+                            <strong>Emily Davis</strong> uploaded new file "design-specs.pdf"
+                            <div class="activity-time">5 hours ago</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Kanban Board -->
+            <div class="kanban-board">
+                <div class="kanban-header">
+                    <h2>Task Management</h2>
+                    <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
+                </div>
+                
+                <div class="kanban-columns" id="kanbanBoard">
+                    <!-- Backlog Column -->
+                    <div class="kanban-column">
+                        <div class="column-header">
+                            <span>Backlog</span>
+                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'backlog'; })); ?></span>
+                        </div>
+                        <div class="task-list" id="backlog">
+                            <?php foreach ($tasks as $task): ?>
+                                <?php if ($task['status'] == 'backlog'): ?>
+                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
+                                        <div>
+                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
+                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
+                                        </div>
+                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
+                                        <div class="task-meta">
+                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
+                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- To Do Column -->
+                    <div class="kanban-column">
+                        <div class="column-header">
+                            <span>To Do</span>
+                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'todo'; })); ?></span>
+                        </div>
+                        <div class="task-list" id="todo">
+                            <?php foreach ($tasks as $task): ?>
+                                <?php if ($task['status'] == 'todo'): ?>
+                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
+                                        <div>
+                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
+                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
+                                        </div>
+                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
+                                        <div class="task-meta">
+                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
+                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- In Progress Column -->
+                    <div class="kanban-column">
+                        <div class="column-header">
+                            <span>In Progress</span>
+                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'in_progress'; })); ?></span>
+                        </div>
+                        <div class="task-list" id="inProgress">
+                            <?php foreach ($tasks as $task): ?>
+                                <?php if ($task['status'] == 'in_progress'): ?>
+                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
+                                        <div>
+                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
+                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
+                                        </div>
+                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
+                                        <div class="task-meta">
+                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
+                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Done Column -->
+                    <div class="kanban-column">
+                        <div class="column-header">
+                            <span>Done</span>
+                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'done'; })); ?></span>
+                        </div>
+                        <div class="task-list" id="done">
+                            <?php foreach ($tasks as $task): ?>
+                                <?php if ($task['status'] == 'done'): ?>
+                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
+                                        <div>
+                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
+                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
+                                        </div>
+                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
+                                        <div class="task-meta">
+                                            <span>Completed: <?php echo date('M j, Y', strtotime($task['updated_at'] ?? $task['created_at'])); ?></span>
+                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+           
+            <div class="file-repository">
+    <div class="file-actions">
+        <h2>File Repository</h2>
+        
+        <?php if (isset($_SESSION['message'])): ?>
+            <div class="upload-message success">
+                <?php echo htmlspecialchars($_SESSION['message']); unset($_SESSION['message']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="upload-message error">
+                <?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST" enctype="multipart/form-data" class="file-upload-form">
+            <div class="file-upload">
+                <input type="file" name="file" id="file-upload-input" required>
+                <label for="file-upload-input">Choose File</label>
+                <span id="file-name-display">No file chosen</span>
+                <button type="submit" class="btn-upload">Upload</button>
+            </div>
+        </form>
     </div>
     
-    <script>
-        // Global variables
-        let currentUserRole = <?php echo isset($_SESSION['role_id']) ? $_SESSION['role_id'] : 0; ?>;
-        let currentUserId = <?php echo isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0; ?>;
-        let currentTopicId = null;
-        const API_BASE_URL = 'forum_api.php';
-
-        // Document Ready Function
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize TinyMCE
-            initTinyMCE();
-            
-            // Initialize the application
-            initApp();
-            
-            // Load initial data
-            loadForumStats();
-            loadCategories();
-            loadTopics();
-            
-            // Show moderation controls if user is admin/moderator
-            if (currentUserRole === 1 || currentUserRole === 2) {
-                document.getElementById('moderationControls').style.display = 'block';
-            }
-        });
-
-        /**
-         * Initialize TinyMCE editor
-         */
-        function initTinyMCE() {
-            tinymce.init({
-                selector: '#topicContent',
-                plugins: 'link lists code',
-                toolbar: 'bold italic | bullist numlist | link code',
-                menubar: false,
-                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
-            });
-        }
-
-        /**
-         * Main application initialization
-         */
-        function initApp() {
-            // DOM Elements
-            const createTopicBtn = document.getElementById('createTopicBtn');
-            const createTopicModal = document.getElementById('createTopicModal');
-            const cancelTopicBtn = document.getElementById('cancelTopic');
-            const topicForm = document.getElementById('topicForm');
-            const topicList = document.getElementById('topicList');
-            const reviewReportsBtn = document.getElementById('reviewReports');
-            const reviewReportsModal = document.getElementById('reviewReportsModal');
-            const topicViewModal = document.getElementById('topicViewModal');
-            const submitReplyBtn = document.getElementById('submitReply');
-            
-            // Event Listeners
-            createTopicBtn.addEventListener('click', showCreateTopicModal);
-            cancelTopicBtn.addEventListener('click', hideCreateTopicModal);
-            reviewReportsBtn.addEventListener('click', showReviewReportsModal);
-            topicForm.addEventListener('submit', handleTopicFormSubmit);
-            submitReplyBtn.addEventListener('click', handleReplySubmit);
-            
-            // Close modals when clicking outside
-            document.addEventListener('click', handleModalOutsideClick);
-            
-            // Admin tab switching
-            setupAdminTabs();
-        }
-
-        /**
-         * Load forum statistics
-         */
-        function loadForumStats() {
-            fetch(`${API_BASE_URL}?action=get_stats`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error(data.error);
-                        return;
-                    }
-                    
-                    document.getElementById('topicCount').textContent = data.topics || 0;
-                    document.getElementById('postCount').textContent = data.posts || 0;
-                    document.getElementById('memberCount').textContent = data.members || 0;
-                })
-                .catch(error => console.error('Error loading forum stats:', error));
-        }
-
-        /**
-         * Load categories for sidebar and dropdown
-         */
-        function loadCategories() {
-            fetch(`${API_BASE_URL}?action=get_categories`)
-                .then(response => response.json())
-                .then(categories => {
-                    const categoryList = document.getElementById('categoryList');
-                    const categoryDropdown = document.getElementById('topicCategory');
-                    
-                    // Clear existing options except the first one
-                    while (categoryDropdown.options.length > 1) {
-                        categoryDropdown.remove(1);
-                    }
-                    
-                    categoryList.innerHTML = '';
-                    
-                    if (categories.length === 0) {
-                        categoryList.innerHTML = '<li>No categories found</li>';
-                        return;
-                    }
-                    
-                    categories.forEach(category => {
-                        // Add to sidebar
-                        const listItem = document.createElement('li');
-                        listItem.innerHTML = `<a href="#" onclick="loadTopics(${category.id}); return false">${category.name}</a>`;
-                        categoryList.appendChild(listItem);
-                        
-                        // Add to dropdown
-                        const option = document.createElement('option');
-                        option.value = category.id;
-                        option.textContent = category.name;
-                        categoryDropdown.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error loading categories:', error));
-        }
-
-        /**
-         * Load topics for the current view
-         */
-        function loadTopics(categoryId = null) {
-            let url = `${API_BASE_URL}?action=get_topics`;
-            if (categoryId) {
-                url += `&category_id=${categoryId}`;
-            }
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(topics => {
-                    const topicList = document.getElementById('topicList');
-                    topicList.innerHTML = '';
-                    
-                    if (topics.length === 0) {
-                        topicList.innerHTML = '<p>No topics found.</p>';
-                        return;
-                    }
-                    
-                    topics.forEach(topic => {
-                        const topicElement = document.createElement('div');
-                        topicElement.className = `topic-item ${topic.active ? '' : 'deactivated'}`;
-                        topicElement.innerHTML = `
-                            <h3 class="topic-title">${topic.title} 
-                                ${topic.pinned ? '<span class="pinned-badge">Pinned</span>' : ''}
-                                ${!topic.active ? '<span class="pinned-badge" style="background:#95a5a6">Hidden</span>' : ''}
-                            </h3>
-                            <div class="topic-meta">Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}</div>
-                            <div class="topic-stats">
-                                <span>${topic.reply_count} replies</span>
-                            </div>
-                            <div class="mod-controls">
-                                <button class="mod-btn" onclick="viewTopic(${topic.id})">View</button>
-                                ${(currentUserRole === 1 || currentUserRole === 2 || topic.author.id === currentUserId) ? 
-                                    `<button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
-                                     <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>` : ''}
-                                ${(currentUserRole === 1 || currentUserRole === 2) ? 
-                                    `<button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
-                                        ${topic.pinned ? 'Unpin' : 'Pin'}
-                                    </button>
-                                    <div class="status-toggle">
-                                        <label class="switch">
-                                            <input type="checkbox" ${topic.active ? 'checked' : ''} onchange="toggleTopicStatus(${topic.id}, this.checked)">
-                                            <span class="slider"></span>
-                                        </label>
-                                        <span>${topic.active ? 'Active' : 'Hidden'}</span>
-                                    </div>` : ''}
-                            </div>
-                        `;
-                        
-                        topicList.appendChild(topicElement);
-                    });
-                })
-                .catch(error => console.error('Error loading topics:', error));
-        }
-
-        /**
-         * View a specific topic
-         */
-        function viewTopic(topicId) {
-            currentTopicId = topicId;
-            
-            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                        return;
-                    }
-                    
-                    const topic = data.topic;
-                    document.getElementById('viewTopicTitle').textContent = topic.title;
-                    document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
-                    document.getElementById('viewTopicMeta').innerHTML = `
-                        Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
-                    `;
-                    document.getElementById('viewTopicContent').innerHTML = topic.content;
-
-                // Check subscription status
-                 currentTopicSubscribed = data.is_subscribed;
-                 updateSubscriptionButton();
-
-                    
-                    // Load replies
-                    const repliesContainer = document.getElementById('topicReplies');
-                    repliesContainer.innerHTML = '<h3>Replies</h3>';
-
-                    // Add subscription controls
-                    const subscriptionControls = document.createElement('div');
-                    subscriptionControls.className = 'subscription-controls';
-                    subscriptionControls.innerHTML = `
-                        <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
-                        <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
-                        repliesContainer.appendChild(subscriptionControls);
-                    
-                    if (data.replies.length === 0) {
-                        repliesContainer.innerHTML += '<p>No replies yet.</p>';
-                    } else {
-                        data.replies.forEach(reply => {
-                            const replyElement = document.createElement('div');
-                            replyElement.className = `reply ${reply.flagged ? 'flagged' : ''}`;
-                            replyElement.innerHTML = `
-                                <div class="reply-content">${reply.content}</div>
-                                <div class="reply-meta">
-                                    Posted by ${reply.author.name} on ${new Date(reply.created_at).toLocaleDateString()}
-                                    ${reply.author.id !== currentUserId ? 
-                                        `<button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>` : ''}
-                                </div>
-                                <div class="flag-form" id="flag-form-${reply.id}">
-                                    <select id="flag-reason-${reply.id}" style="margin-bottom:5px; width:100%">
-                                        <option value="spam">Spam</option>
-                                        <option value="inappropriate">Inappropriate Content</option>
-                                        <option value="offensive">Offensive Language</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                    <button class="btn btn-primary" onclick="submitFlag(${reply.id}, ${topicId})">Submit Report</button>
-                                </div>
-                                ${(currentUserRole === 1 || currentUserRole === 2 || reply.author.id === currentUserId) ? 
-                                    `<div class="mod-controls">
-                                        <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
-                                        <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
-                                    </div>` : ''}
-                            `;
-                            repliesContainer.appendChild(replyElement);
-                        });
-                    }
-                      // Add event listeners for subscription buttons
-                      document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
-                    document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
-                    document.getElementById('topicViewModal').style.display = 'flex';
-                })
-                .catch(error => {
-                    console.error('Error loading topic:', error);
-                    alert('Failed to load topic');
-                });
-        }
-
-
-        /**
-         * Update subscription button visibility
-         */
-        function updateSubscriptionButton() {
-            const subscribeBtn = document.getElementById('subscribeBtn');
-            const unsubscribeBtn = document.getElementById('unsubscribeBtn');
-            
-            if (subscribeBtn && unsubscribeBtn) {
-                subscribeBtn.style.display = currentTopicSubscribed ? 'none' : 'block';
-                unsubscribeBtn.style.display = currentTopicSubscribed ? 'block' : 'none';
-            }
-        }
-
-         /**
-         * Subscribe to a topic
-         */
-        function subscribeToTopic(topicId) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'subscribe_topic',
-                    topic_id: topicId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                currentTopicSubscribed = true;
-                updateSubscriptionButton();
-                alert('You have subscribed to this topic');
-            })
-            .catch(error => {
-                console.error('Error subscribing to topic:', error);
-                alert('Failed to subscribe');
-            });
-        }
-
-        /**
-         * Unsubscribe from a topic
-         */
-        function unsubscribeFromTopic(topicId) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'unsubscribe_topic',
-                    topic_id: topicId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                currentTopicSubscribed = false;
-                updateSubscriptionButton();
-                alert('You have unsubscribed from this topic');
-            })
-            .catch(error => {
-                console.error('Error unsubscribing from topic:', error);
-                alert('Failed to unsubscribe');
-            });
-        }
-
-        /**
-         * Notify subscribers (called when a new reply is posted)
-         */
-        function notifySubscribers(topicId, userId, replyId) {
-            // This would typically be handled server-side in a real application
-            console.log(`Notifying subscribers of new reply ${replyId} to topic ${topicId}`);
-            
-            // In a real implementation, this would:
-            // 1. Get list of subscribers from forum_subscriptions table
-            // 2. Send notifications (email, in-app, etc.)
-            // 3. Return success/failure status
-            
-            return Promise.resolve({ success: true });
-        }
-
-        /**
-         * Show create topic modal
-         */
-        function showCreateTopicModal() {
-            document.getElementById('createTopicModal').style.display = 'flex';
-        }
-
-        /**
-         * Hide create topic modal
-         */
-        function hideCreateTopicModal() {
-            document.getElementById('createTopicModal').style.display = 'none';
-        }
-
-        /**
-         * Handle topic form submission
-         */
-        function handleTopicFormSubmit(e) {
-            e.preventDefault();
-            
-            const categoryId = document.getElementById('topicCategory').value;
-            const title = document.getElementById('topicTitle').value;
-            const content = tinymce.get('topicContent').getContent();
-            
-            if (!categoryId || !title || !content) {
-                alert('Please fill in all fields');
-                return;
-            }
-            
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'create_topic',
-                    category_id: categoryId,
-                    title: title,
-                    content: content
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                alert('Topic created successfully!');
-                hideCreateTopicModal();
-                loadTopics();
-                
-                // Reset form
-                document.getElementById('topicCategory').value = '';
-                document.getElementById('topicTitle').value = '';
-                tinymce.get('topicContent').setContent('');
-            })
-            .catch(error => {
-                console.error('Error creating topic:', error);
-                alert('Failed to create topic');
-            });
-        }
-
-        /**
-         * Handle reply submission
-         */
-        function handleReplySubmit() {
-            const content = document.getElementById('replyContent').value;
-            
-            if (!content.trim()) {
-                alert('Please enter reply content');
-                return;
-            }
-            
-            if (!currentTopicId) {
-                alert('No topic selected');
-                return;
-            }
-            
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'create_reply',
-                    topic_id: currentTopicId,
-                    content: content
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                document.getElementById('replyContent').value = '';
-                viewTopic(currentTopicId); // Refresh the view
-                loadTopics(); // Update topic list counts
-            })
-            .catch(error => {
-                console.error('Error creating reply:', error);
-                alert('Failed to create reply');
-            });
-        }
-
-        /**
-         * Show review reports modal
-         */
-        function showReviewReportsModal(e) {
-            e.preventDefault();
-            document.getElementById('reviewReportsModal').style.display = 'flex';
-            loadFlaggedContent();
-        }
-
-        /**
-         * Handle modal outside click
-         */
-        function handleModalOutsideClick(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        }
-
-        /**
-         * Setup admin tabs functionality
-         */
-        function setupAdminTabs() {
-            document.querySelectorAll('.admin-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // Update tab styles
-                    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    
-                    // Update content visibility
-                    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
-                    document.getElementById(`${tab.dataset.tab}Content`).classList.add('active');
-                    
-                    // Load content if needed
-                    if (tab.dataset.tab === 'flagged') {
-                        loadFlaggedContent();
-                    } else if (tab.dataset.tab === 'users') {
-                        loadUserManagement();
-                    } else if (tab.dataset.tab === 'categories') {
-                        loadCategoryManagement();
-                    }
-                });
-            });
-        }
-
-        /**
-         * Edit a topic
-         */
-        function editTopic(topicId) {
-            // In a real implementation, this would open an edit form
-            alert(`Edit functionality for topic ${topicId} would open an edit form`);
-        }
-
-        /**
-         * Edit a reply
-         */
-        function editReply(replyId, topicId) {
-            // In a real implementation, this would open an edit form
-            alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
-        }
-
-        /**
-         * Confirm deletion of a topic or reply
-         */
-        function confirmDelete(id, isTopic) {
-            if (!confirm(`Are you sure you want to delete this ${isTopic ? 'topic' : 'reply'}?`)) {
-                return;
-            }
-            
-            const action = isTopic ? 'delete_topic' : 'delete_reply';
-            
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: action,
-                    id: id
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                alert(`${isTopic ? 'Topic' : 'Reply'} deleted successfully`);
-                
-                if (isTopic) {
-                    loadTopics();
-                    document.getElementById('topicViewModal').style.display = 'none';
-                } else {
-                    viewTopic(currentTopicId); // Refresh the current topic view
-                }
-            })
-            .catch(error => {
-                console.error(`Error deleting ${isTopic ? 'topic' : 'reply'}:`, error);
-                alert(`Failed to delete ${isTopic ? 'topic' : 'reply'}`);
-            });
-        }
-
-        /**
-         * Toggle pin status of a topic
-         */
-        function togglePin(topicId, currentlyPinned) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'toggle_pin',
-                    topic_id: topicId,
-                    pinned: !currentlyPinned
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                loadTopics();
-            })
-            .catch(error => {
-                console.error('Error toggling pin status:', error);
-                alert('Failed to update pin status');
-            });
-        }
-
-        /**
-         * Toggle active status of a topic
-         */
-        function toggleTopicStatus(topicId, isActive) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'toggle_active',
-                    topic_id: topicId,
-                    active: isActive
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                loadTopics();
-            })
-            .catch(error => {
-                console.error('Error toggling topic status:', error);
-                alert('Failed to update topic status');
-            });
-        }
-
-        /**
-         * Show flag form for a reply
-         */
-        function showFlagForm(replyId) {
-            document.querySelectorAll('.flag-form').forEach(form => form.style.display = 'none');
-            document.getElementById(`flag-form-${replyId}`).style.display = 'block';
-        }
-
-        /**
-         * Submit a flag for a reply
-         */
-        function submitFlag(replyId, topicId) {
-            const reason = document.getElementById(`flag-reason-${replyId}`).value;
-            
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'flag_reply',
-                    reply_id: replyId,
-                    reason: reason
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                alert('Thank you for reporting. Moderators will review this content.');
-                document.getElementById(`flag-form-${replyId}`).style.display = 'none';
-                
-                // Refresh flagged content list if admin panel is open
-                if (document.getElementById('reviewReportsModal').style.display === 'flex') {
-                    loadFlaggedContent();
-                }
-            })
-            .catch(error => {
-                console.error('Error flagging reply:', error);
-                alert('Failed to submit report');
-            });
-        }
-
-        /**
-         * Load flagged content for admin review
-         */
-        function loadFlaggedContent() {
-            fetch(`${API_BASE_URL}?action=get_flagged_content`)
-                .then(response => response.json())
-                .then(flaggedContent => {
-                    const flaggedPostsList = document.getElementById('flaggedPostsList');
-                    flaggedPostsList.innerHTML = '';
-                    
-                    document.getElementById('flag-count').textContent = `(${flaggedContent.length})`;
-                    
-                    if (flaggedContent.length === 0) {
-                        flaggedPostsList.innerHTML = '<p>No flagged content to review.</p>';
-                        return;
-                    }
-                    
-                    flaggedContent.forEach(item => {
-                        const flaggedItem = document.createElement('div');
-                        flaggedItem.className = 'flagged-item';
-                        flaggedItem.innerHTML = `
-                            <p><strong>Topic:</strong> <a href="#" onclick="viewTopic(${item.topic_id}); return false">${item.topic_title}</a></p>
-                            <p><strong>Author:</strong> ${item.author_name} | <strong>Reported for:</strong> ${item.flag_reason || 'No reason provided'}</p>
-                            <div class="flagged-content-preview" style="padding:10px;background:#f9f9f9;margin:5px 0">
-                                ${item.content}
-                            </div>
-                            <div class="admin-actions">
-                                <button class="btn btn-primary" onclick="resolveFlagAdmin(${item.reply_id}, 'keep')">Keep Content</button>
-                                <button class="btn btn-secondary" onclick="resolveFlagAdmin(${item.reply_id}, 'warn')">Warn User</button>
-                                <button class="btn btn-danger" onclick="resolveFlagAdmin(${item.reply_id}, 'delete')">Delete Post</button>
-                            </div>
-                        `;
-                        flaggedPostsList.appendChild(flaggedItem);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error loading flagged content:', error);
-                    alert('Failed to load flagged content');
-                });
-        }
-
-        /**
-         * Resolve a flag (admin action)
-         */
-        function resolveFlagAdmin(replyId, action) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'resolve_flag',
-                    reply_id: replyId,
-                    resolution: action
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                alert(`Action "${action}" completed successfully`);
-                loadFlaggedContent();
-                
-                // Refresh topic view if open
-                if (document.getElementById('topicViewModal').style.display === 'flex') {
-                    viewTopic(currentTopicId);
-                }
-            })
-            .catch(error => {
-                console.error('Error resolving flag:', error);
-                alert('Failed to complete action');
-            });
-        }
-
-        /**
-         * Load user management content
-         */
-        function loadUserManagement() {
-            // In a real implementation, this would load user management UI
-            document.getElementById('userManagementContent').innerHTML = `
-                <p>User management functionality would be implemented here.</p>
-                <div style="margin-top: 20px;">
-                    <button class="btn btn-primary" onclick="alert('User management actions would go here')">
-                        Manage Users
-                    </button>
+    <?php if (!empty($files)): ?>
+        <div class="file-grid">
+            <?php foreach ($files as $file): 
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $iconClass = 'other';
+                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'svg'])) $iconClass = 'image';
+                elseif (in_array($ext, ['pdf'])) $iconClass = 'pdf';
+                elseif (in_array($ext, ['doc', 'docx'])) $iconClass = 'doc';
+                elseif (in_array($ext, ['xls', 'xlsx', 'csv'])) $iconClass = 'xls';
+                elseif (in_array($ext, ['zip', 'rar', 'tar', 'gz'])) $iconClass = 'zip';
+            ?>
+                <div class="file-card">
+                    <div class="file-icon <?php echo $iconClass; ?>">
+                        <?php 
+                        if ($iconClass == 'image') echo '🖼️';
+                        elseif ($iconClass == 'pdf') echo '📕';
+                        elseif ($iconClass == 'doc') echo '📄';
+                        elseif ($iconClass == 'xls') echo '📊';
+                        elseif ($iconClass == 'zip') echo '🗄️';
+                        else echo '📁';
+                        ?>
+                    </div>
+                    <h4 class="file-name" title="<?php echo htmlspecialchars($file['name']); ?>">
+                        <?php echo htmlspecialchars($file['name']); ?>
+                    </h4>
+                    <div class="file-meta">
+                        <div><i>📅</i> <?php echo htmlspecialchars($file['uploaded']); ?></div>
+                        <div><i>📏</i> <?php echo htmlspecialchars($file['size']); ?></div>
+                        <div><i>🆔</i> <?php echo strtoupper($ext); ?> file</div>
+                    </div>
+                    <div class="file-actions-bottom">
+                        <a href="download.php?id=<?php echo $file['id']; ?>" class="file-download">
+                            <i>⬇️</i> Download
+                        </a>
+                        <a href="delete_file.php?id=<?php echo $file['id']; ?>" class="file-delete" onclick="return confirm('Are you sure you want to delete this file?')">
+                            <i>🗑️</i> Delete
+                        </a>
+                    </div>
                 </div>
-            `;
-        }
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <h3>No files uploaded yet</h3>
+            <p>Upload your first file using the form above</p>
+        </div>
+    <?php endif; ?>
+</div>
+    
 
-        /**
-         * Load category management content
-         */
-        function loadCategoryManagement() {
-            // In a real implementation, this would load category management UI
-            document.getElementById('categoryManagementContent').innerHTML = `
-                <p>Category management functionality would be implemented here.</p>
-                <div style="margin-top: 20px;">
-                    <button class="btn btn-primary" onclick="alert('Category management actions would go here')">
-                        Manage Categories
-                    </button>
+            
+            <!-- Project Timeline & Reporting -->
+            <div class="project-timeline">
+                <h2>Project Timeline</h2>
+                <div class="gantt-chart" id="ganttChart">
+                    <div style="display: flex; height: 100%; padding: 20px; flex-direction: column; gap: 15px;">
+                        <div style="margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>Planning</span>
+                                <span>Jun 15 - Jun 25</span>
+                            </div>
+                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
+                                <div style="height: 100%; width: 100%; background: #2ecc71;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>Design</span>
+                                <span>Jun 20 - Jul 10</span>
+                            </div>
+                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
+                                <div style="height: 100%; width: 85%; background: #3498db;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>Development</span>
+                                <span>Jul 1 - Aug 15</span>
+                            </div>
+                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
+                                <div style="height: 100%; width: 65%; background: #3498db;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            `;
+            </div>
+            
+            <div class="reporting-section">
+                <h2>Project Reports</h2>
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Modal -->
+<div class="modal" id="taskModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Task</h3>
+            <button class="close-modal" onclick="closeModal()">×</button>
+        </div>
+        
+        <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST">
+            <input type="hidden" name="create_task" value="1">
+            
+            <div class="form-group">
+                <label for="taskTitle">Task Title</label>
+                <input type="text" id="taskTitle" class="form-control" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="taskDescription">Description</label>
+                <textarea id="taskDescription" name="description" class="form-control" rows="4"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="taskPriority">Priority</label>
+                <select id="taskPriority" class="form-control" name="priority">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="taskStatus">Status</label>
+                <select id="taskStatus" class="form-control" name="status">
+                    <option value="backlog" selected>Backlog</option>
+                    <option value="todo">To Do</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="taskAssignee">Assignee</label>
+                <select id="taskAssignee" class="form-control" name="assignee_id">
+                    <option value="">Unassigned</option>
+                    <?php foreach ($team_members as $member): ?>
+                        <option value="<?php echo $member['id']; ?>"><?php echo htmlspecialchars($member['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="taskDeadline">Deadline</label>
+                <input type="date" id="taskDeadline" name="deadline" class="form-control">
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Initialize Kanban Board Drag and Drop
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize SortableJS for kanban columns
+    new Sortable(document.getElementById('backlog'), {
+        group: 'tasks',
+        animation: 150,
+        ghostClass: 'dragging-task',
+        onEnd: function(evt) {
+            updateTaskStatus(evt.item.dataset.taskId, 'backlog');
         }
-    </script>
+    });
+    
+    new Sortable(document.getElementById('todo'), {
+        group: 'tasks',
+        animation: 150,
+        ghostClass: 'dragging-task',
+        onEnd: function(evt) {
+            updateTaskStatus(evt.item.dataset.taskId, 'todo');
+        }
+    });
+    
+    new Sortable(document.getElementById('inProgress'), {
+        group: 'tasks',
+        animation: 150,
+        ghostClass: 'dragging-task',
+        onEnd: function(evt) {
+            updateTaskStatus(evt.item.dataset.taskId, 'in_progress');
+        }
+    });
+    
+    new Sortable(document.getElementById('done'), {
+        group: 'tasks',
+        animation: 150,
+        ghostClass: 'dragging-task',
+        onEnd: function(evt) {
+            updateTaskStatus(evt.item.dataset.taskId, 'done');
+        }
+    });
+    
+    // Initialize Charts
+    initProgressChart();
+});
+
+function updateTaskStatus(taskId, newStatus) {
+    fetch('update_task.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'task_id=' + taskId + '&status=' + newStatus
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Failed to update task status');
+        }
+    });
+}
+
+function initProgressChart() {
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Planning', 'Design', 'Development', 'Testing', 'Deployment'],
+            datasets: [{
+                label: 'Completion %',
+                data: [100, 85, 65, 30, 5],
+                backgroundColor: [
+                    '#2ecc71',
+                    '#3498db',
+                    '#3498db',
+                    '#f39c12',
+                    '#e74c3c'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+
+// Modal Functions
+function openTaskModal() {
+    document.getElementById('taskModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
+
+document.getElementById('file-upload-input').addEventListener('change', function(e) {
+    const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+    document.getElementById('file-name-display').textContent = fileName;
+});
+
+
+
+
+
+
+
+
+
+
+</script>
 </body>
 </html>

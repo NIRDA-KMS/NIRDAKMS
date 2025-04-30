@@ -1,23 +1,26 @@
 <?php
-include 'connect.php';
+include('../SchedureEvent/connect.php'); // Include database connection file
 
-// SQL to create forum_topics table
-$sql ="CREATE TABLE project_goals (
-    goal_id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
-    INDEX (project_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+// SQL to create tasks table
+$sql = "CREATE TABLE files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(255) NOT NULL,
+    size INT NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    uploaded_by INT NOT NULL,
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    
+)";
+
+
 // Execute query
-if (mysqli_query($connection, $sql)) {
-    echo "Table project_goals created successfully";
+$result = mysqli_query($connection, $sql);
+if ($result) {
+    echo "Table tasks created successfully";
 } else {
     echo "Error creating table: " . mysqli_error($connection);
 }
 
-// Close connection
-mysqli_close($connection);
+mysqli_close($connection); // Close the connection
 ?>
