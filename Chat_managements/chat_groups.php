@@ -242,7 +242,7 @@ if (isset($_GET['action'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat_types Application</title>
+    <title>Chat Application</title>
     <style>
         /* Your existing CSS styles */
         :root {

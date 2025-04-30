@@ -648,15 +648,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <div class="nested-dropdown">
-                            <a href="#" class="nested-dropbtn"><i class="fas fa-comment-dots"></i> Chat Management</a>
-                            <div class="nested-dropdown-content">
-                                <a href="../Chat_managements/chat_contacts.php" onclick="showContent('chatContacts')"><i class="fas fa-address-book"></i> Contacts</a>
-                                <a href="../Chat_managements/online_users.php" onclick="showContent('onlineUsers')"><i class="fas fa-user-circle"></i> Online Users</a>
-                                <a href="../Chat_managements/chat_groups.php" onclick="showContent('chatGroups')"><i class="fas fa-users"></i> Manage Groups</a>
-                                <a href="../Chat_managements/manage_chats.php" onclick="showContent('manageChats')"><i class="fas fa-comments"></i> Manage Chats</a>
-                            </div>
+                            <!-- <a href="#" class="nested-dropbtn"><i class="fas fa-comment-dots"></i> Chat Management</a> -->
+                            <!-- <div class="nested-dropdown-content"> -->
+                                <!-- <a href="../Chat_managements/chat_contacts.php" onclick="showContent('chatContacts')"><i class="fas fa-address-book"></i> Contacts</a> -->
+                                <!-- <a href="../Chat_managements/online_users.php" onclick="showContent('onlineUsers')"><i class="fas fa-user-circle"></i> Online Users</a> -->
+                                <a href="../Chat_managements/chat_groups.php" onclick="showContent('chatGroups')"><i class="fas fa-users"></i> chat application</a>
+                                <!-- <a href="../Chat_managements/manage_chats.php" onclick="showContent('manageChats')"><i class="fas fa-comments"></i> Manage Chats</a> -->
+                            <!-- </div> -->
                         </div>
-                    </div
+                        </div>
 
                     
                 </li>
