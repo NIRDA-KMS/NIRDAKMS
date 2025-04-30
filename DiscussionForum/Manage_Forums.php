@@ -1,10 +1,12 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
-}
+// session_start();
+require_once('../SchedureEvent/connect.php');
+
+ require_once __DIR__ . '/../Internees_task/auth/auth_check.php'; 
+//  include __DIR__ . '/../Internees_task/login_success_popup.php';
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -635,7 +637,6 @@ if (!isset($_SESSION['user_id'])) {
         let currentUserRole = <?php echo isset($_SESSION['role_id']) ? $_SESSION['role_id'] : 0; ?>;
         let currentUserId = <?php echo isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0; ?>;
         let currentTopicId = null;
-        let currentTopicSubscribed = false;
         const API_BASE_URL = 'forum_api.php';
 
         // Document Ready Function
@@ -657,6 +658,9 @@ if (!isset($_SESSION['user_id'])) {
             }
         });
 
+        /**
+         * Initialize TinyMCE editor
+         */
         function initTinyMCE() {
             tinymce.init({
                 selector: '#topicContent',
@@ -667,6 +671,9 @@ if (!isset($_SESSION['user_id'])) {
             });
         }
 
+        /**
+         * Main application initialization
+         */
         function initApp() {
             // DOM Elements
             const createTopicBtn = document.getElementById('createTopicBtn');
@@ -693,6 +700,9 @@ if (!isset($_SESSION['user_id'])) {
             setupAdminTabs();
         }
 
+        /**
+         * Load forum statistics
+         */
         function loadForumStats() {
             fetch(`${API_BASE_URL}?action=get_stats`)
                 .then(response => response.json())
@@ -709,6 +719,9 @@ if (!isset($_SESSION['user_id'])) {
                 .catch(error => console.error('Error loading forum stats:', error));
         }
 
+        /**
+         * Load categories for sidebar and dropdown
+         */
         function loadCategories() {
             fetch(`${API_BASE_URL}?action=get_categories`)
                 .then(response => response.json())
@@ -731,12 +744,12 @@ if (!isset($_SESSION['user_id'])) {
                     categories.forEach(category => {
                         // Add to sidebar
                         const listItem = document.createElement('li');
-                        listItem.innerHTML = `<a href="#" onclick="loadTopics(${category.category_id}); return false">${category.name}</a>`;
+                        listItem.innerHTML = `<a href="#" onclick="loadTopics(${category.id}); return false">${category.name}</a>`;
                         categoryList.appendChild(listItem);
                         
                         // Add to dropdown
                         const option = document.createElement('option');
-                        option.value = category.category_id;
+                        option.value = category.id;
                         option.textContent = category.name;
                         categoryDropdown.appendChild(option);
                     });
@@ -744,6 +757,9 @@ if (!isset($_SESSION['user_id'])) {
                 .catch(error => console.error('Error loading categories:', error));
         }
 
+        /**
+         * Load topics for the current view
+         */
         function loadTopics(categoryId = null) {
             let url = `${API_BASE_URL}?action=get_topics`;
             if (categoryId) {
@@ -798,86 +814,91 @@ if (!isset($_SESSION['user_id'])) {
                 .catch(error => console.error('Error loading topics:', error));
         }
 
+        /**
+         * View a specific topic
+         */
         function viewTopic(topicId) {
             currentTopicId = topicId;
             
-            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`, {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                const topic = data.topic;
-                document.getElementById('viewTopicTitle').textContent = topic.title;
-                document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
-                document.getElementById('viewTopicMeta').innerHTML = `
-                    Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
-                `;
-                document.getElementById('viewTopicContent').innerHTML = topic.content;
+            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    
+                    const topic = data.topic;
+                    document.getElementById('viewTopicTitle').textContent = topic.title;
+                    document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
+                    document.getElementById('viewTopicMeta').innerHTML = `
+                        Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
+                    `;
+                    document.getElementById('viewTopicContent').innerHTML = topic.content;
 
                 // Check subscription status
-                currentTopicSubscribed = data.is_subscribed;
-                updateSubscriptionButton();
-                
-                // Load replies
-                const repliesContainer = document.getElementById('topicReplies');
-                repliesContainer.innerHTML = '<h3>Replies</h3>';
+                 currentTopicSubscribed = data.is_subscribed;
+                 updateSubscriptionButton();
 
-                // Add subscription controls
-                const subscriptionControls = document.createElement('div');
-                subscriptionControls.className = 'subscription-controls';
-                subscriptionControls.innerHTML = `
-                    <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
-                    <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
-                repliesContainer.appendChild(subscriptionControls);
-                
-                if (data.replies.length === 0) {
-                    repliesContainer.innerHTML += '<p>No replies yet.</p>';
-                } else {
-                    data.replies.forEach(reply => {
-                        const replyElement = document.createElement('div');
-                        replyElement.className = `reply ${reply.flagged ? 'flagged' : ''}`;
-                        replyElement.innerHTML = `
-                            <div class="reply-content">${reply.content}</div>
-                            <div class="reply-meta">
-                                Posted by ${reply.author.name} on ${new Date(reply.created_at).toLocaleDateString()}
-                                ${reply.author.id !== currentUserId ? 
-                                    `<button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>` : ''}
-                            </div>
-                            <div class="flag-form" id="flag-form-${reply.id}">
-                                <select id="flag-reason-${reply.id}" style="margin-bottom:5px; width:100%">
-                                    <option value="spam">Spam</option>
-                                    <option value="inappropriate">Inappropriate Content</option>
-                                    <option value="offensive">Offensive Language</option>
-                                    <option value="other">Other</option>
-                                </select>
-                                <button class="btn btn-primary" onclick="submitFlag(${reply.id}, ${topicId})">Submit Report</button>
-                            </div>
-                            ${(currentUserRole === 1 || currentUserRole === 2 || reply.author.id === currentUserId) ? 
-                                `<div class="mod-controls">
-                                    <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
-                                    <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
-                                </div>` : ''}
-                        `;
-                        repliesContainer.appendChild(replyElement);
-                    });
-                }
-                
-                // Add event listeners for subscription buttons
-                document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
-                document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
-                document.getElementById('topicViewModal').style.display = 'flex';
-            })
-            .catch(error => {
-                console.error('Error loading topic:', error);
-                alert('Failed to load topic');
-            });
+                    
+                    // Load replies
+                    const repliesContainer = document.getElementById('topicReplies');
+                    repliesContainer.innerHTML = '<h3>Replies</h3>';
+
+                    // Add subscription controls
+                    const subscriptionControls = document.createElement('div');
+                    subscriptionControls.className = 'subscription-controls';
+                    subscriptionControls.innerHTML = `
+                        <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
+                        <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
+                        repliesContainer.appendChild(subscriptionControls);
+                    
+                    if (data.replies.length === 0) {
+                        repliesContainer.innerHTML += '<p>No replies yet.</p>';
+                    } else {
+                        data.replies.forEach(reply => {
+                            const replyElement = document.createElement('div');
+                            replyElement.className = `reply ${reply.flagged ? 'flagged' : ''}`;
+                            replyElement.innerHTML = `
+                                <div class="reply-content">${reply.content}</div>
+                                <div class="reply-meta">
+                                    Posted by ${reply.author.name} on ${new Date(reply.created_at).toLocaleDateString()}
+                                    ${reply.author.id !== currentUserId ? 
+                                        `<button class="flag-btn" onclick="showFlagForm(${reply.id})">Report</button>` : ''}
+                                </div>
+                                <div class="flag-form" id="flag-form-${reply.id}">
+                                    <select id="flag-reason-${reply.id}" style="margin-bottom:5px; width:100%">
+                                        <option value="spam">Spam</option>
+                                        <option value="inappropriate">Inappropriate Content</option>
+                                        <option value="offensive">Offensive Language</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    <button class="btn btn-primary" onclick="submitFlag(${reply.id}, ${topicId})">Submit Report</button>
+                                </div>
+                                ${(currentUserRole === 1 || currentUserRole === 2 || reply.author.id === currentUserId) ? 
+                                    `<div class="mod-controls">
+                                        <button class="mod-btn" onclick="editReply(${reply.id}, ${topicId})">Edit</button>
+                                        <button class="mod-btn" onclick="confirmDelete(${reply.id}, false)">Delete</button>
+                                    </div>` : ''}
+                            `;
+                            repliesContainer.appendChild(replyElement);
+                        });
+                    }
+                      // Add event listeners for subscription buttons
+                      document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
+                    document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
+                    document.getElementById('topicViewModal').style.display = 'flex';
+                })
+                .catch(error => {
+                    console.error('Error loading topic:', error);
+                    alert('Failed to load topic');
+                });
         }
 
+
+        /**
+         * Update subscription button visibility
+         */
         function updateSubscriptionButton() {
             const subscribeBtn = document.getElementById('subscribeBtn');
             const unsubscribeBtn = document.getElementById('unsubscribeBtn');
@@ -888,6 +909,9 @@ if (!isset($_SESSION['user_id'])) {
             }
         }
 
+         /**
+         * Subscribe to a topic
+         */
         function subscribeToTopic(topicId) {
             fetch(API_BASE_URL, {
                 method: 'POST',
@@ -916,6 +940,9 @@ if (!isset($_SESSION['user_id'])) {
             });
         }
 
+        /**
+         * Unsubscribe from a topic
+         */
         function unsubscribeFromTopic(topicId) {
             fetch(API_BASE_URL, {
                 method: 'POST',
@@ -944,70 +971,87 @@ if (!isset($_SESSION['user_id'])) {
             });
         }
 
+        /**
+         * Notify subscribers (called when a new reply is posted)
+         */
+        function notifySubscribers(topicId, userId, replyId) {
+            // This would typically be handled server-side in a real application
+            console.log(`Notifying subscribers of new reply ${replyId} to topic ${topicId}`);
+            
+            // In a real implementation, this would:
+            // 1. Get list of subscribers from forum_subscriptions table
+            // 2. Send notifications (email, in-app, etc.)
+            // 3. Return success/failure status
+            
+            return Promise.resolve({ success: true });
+        }
+
+        /**
+         * Show create topic modal
+         */
         function showCreateTopicModal() {
             document.getElementById('createTopicModal').style.display = 'flex';
         }
 
+        /**
+         * Hide create topic modal
+         */
         function hideCreateTopicModal() {
             document.getElementById('createTopicModal').style.display = 'none';
         }
 
-// In your handleTopicFormSubmit function, update it to:
-
-function handleTopicFormSubmit(e) {
-    e.preventDefault();
-    
-    const categoryId = document.getElementById('topicCategory').value;
-    const title = document.getElementById('topicTitle').value;
-    const content = tinymce.get('topicContent').getContent();
-    
-    if (!categoryId || !title || !content) {
-        alert('Please fill in all fields');
-        return;
-    }
-    
-    // // Create FormData object for better handling
-    // const formData = new FormData();
-    // formData.append('action', 'create_topic');
-    // formData.append('category_id', categoryId);
-    // formData.append('title', title);
-    // formData.append('content', content);
-    
-    fetch(API_BASE_URL + '?action=create_topic', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            category_id: categoryId,
-            title: title,
-            content: content
-        }),
-        credentials: 'include'
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => { throw new Error(err.error || 'Network response was not ok');
+        /**
+         * Handle topic form submission
+         */
+        function handleTopicFormSubmit(e) {
+            e.preventDefault();
+            
+            const categoryId = document.getElementById('topicCategory').value;
+            const title = document.getElementById('topicTitle').value;
+            const content = tinymce.get('topicContent').getContent();
+            
+            if (!categoryId || !title || !content) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'create_topic',
+                    category_id: categoryId,
+                    title: title,
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert('Topic created successfully!');
+                hideCreateTopicModal();
+                loadTopics();
+                
+                // Reset form
+                document.getElementById('topicCategory').value = '';
+                document.getElementById('topicTitle').value = '';
+                tinymce.get('topicContent').setContent('');
+            })
+            .catch(error => {
+                console.error('Error creating topic:', error);
+                alert('Failed to create topic');
             });
         }
-        return response.json();
-    })
-    .then(data => {
-        alert(data.message || 'Topic created successfully!');
-        hideCreateTopicModal();
-        loadTopics();
-                
-        // Reset form
-        document.getElementById('topicCategory').value = '';
-        document.getElementById('topicTitle').value = '';
-        tinymce.get('topicContent').setContent('');
-    })
-    .catch(error => {
-        console.error('Error creating topic:', error);
-        alert('Failed to create topic: ' + error.message);
-    });
-}
 
+        /**
+         * Handle reply submission
+         */
         function handleReplySubmit() {
             const content = document.getElementById('replyContent').value;
             
@@ -1049,18 +1093,27 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Show review reports modal
+         */
         function showReviewReportsModal(e) {
             e.preventDefault();
             document.getElementById('reviewReportsModal').style.display = 'flex';
             loadFlaggedContent();
         }
 
+        /**
+         * Handle modal outside click
+         */
         function handleModalOutsideClick(e) {
             if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
             }
         }
 
+        /**
+         * Setup admin tabs functionality
+         */
         function setupAdminTabs() {
             document.querySelectorAll('.admin-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
@@ -1084,16 +1137,25 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Edit a topic
+         */
         function editTopic(topicId) {
             // In a real implementation, this would open an edit form
             alert(`Edit functionality for topic ${topicId} would open an edit form`);
         }
 
+        /**
+         * Edit a reply
+         */
         function editReply(replyId, topicId) {
             // In a real implementation, this would open an edit form
             alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
         }
 
+        /**
+         * Confirm deletion of a topic or reply
+         */
         function confirmDelete(id, isTopic) {
             if (!confirm(`Are you sure you want to delete this ${isTopic ? 'topic' : 'reply'}?`)) {
                 return;
@@ -1133,6 +1195,9 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Toggle pin status of a topic
+         */
         function togglePin(topicId, currentlyPinned) {
             fetch(API_BASE_URL, {
                 method: 'POST',
@@ -1160,6 +1225,9 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Toggle active status of a topic
+         */
         function toggleTopicStatus(topicId, isActive) {
             fetch(API_BASE_URL, {
                 method: 'POST',
@@ -1187,11 +1255,17 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Show flag form for a reply
+         */
         function showFlagForm(replyId) {
             document.querySelectorAll('.flag-form').forEach(form => form.style.display = 'none');
             document.getElementById(`flag-form-${replyId}`).style.display = 'block';
         }
 
+        /**
+         * Submit a flag for a reply
+         */
         function submitFlag(replyId, topicId) {
             const reason = document.getElementById(`flag-reason-${replyId}`).value;
             
@@ -1227,6 +1301,9 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Load flagged content for admin review
+         */
         function loadFlaggedContent() {
             fetch(`${API_BASE_URL}?action=get_flagged_content`)
                 .then(response => response.json())
@@ -1265,6 +1342,9 @@ function handleTopicFormSubmit(e) {
                 });
         }
 
+        /**
+         * Resolve a flag (admin action)
+         */
         function resolveFlagAdmin(replyId, action) {
             fetch(API_BASE_URL, {
                 method: 'POST',
@@ -1298,6 +1378,9 @@ function handleTopicFormSubmit(e) {
             });
         }
 
+        /**
+         * Load user management content
+         */
         function loadUserManagement() {
             // In a real implementation, this would load user management UI
             document.getElementById('userManagementContent').innerHTML = `
@@ -1310,6 +1393,9 @@ function handleTopicFormSubmit(e) {
             `;
         }
 
+        /**
+         * Load category management content
+         */
         function loadCategoryManagement() {
             // In a real implementation, this would load category management UI
             document.getElementById('categoryManagementContent').innerHTML = `

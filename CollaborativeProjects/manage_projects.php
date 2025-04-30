@@ -1,214 +1,3 @@
-<?php
-session_start();
-include('../SchedureEvent/connect.php');
-
-// Database connection
-if (!$connection) {
-    die("Database connection failed");
-}
-
-// Handle AJAX requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Handle task creation
-    if (isset($_POST['create_task'])) {
-        $title = $_POST['title'] ?? '';
-        $description = $_POST['description'] ?? '';
-        $priority = $_POST['priority'] ?? 'medium';
-        $status = $_POST['status'] ?? 'backlog';
-        $assignee_id = $_POST['assignee_id'] ?? null;
-        $deadline = $_POST['deadline'] ?? null;
-
-        if (!empty($title)) {
-            $stmt = $connection->prepare("INSERT INTO tasks (title, description, status, priority, assignee_id, deadline) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssis", $title, $description, $status, $priority, $assignee_id, $deadline);
-            
-            if ($stmt->execute()) {
-                echo json_encode(['success' => true, 'message' => 'Task created successfully!']);
-            } else {
-                echo json_encode(['success' => false, 'message' => "Error creating task: " . $stmt->error]);
-            }
-            $stmt->close();
-        } else {
-            echo json_encode(['success' => false, 'message' => "Title is required"]);
-        }
-        exit();
-    }
-
-    // Handle file upload
-    if (isset($_FILES['file'])) {
-        header('Content-Type: application/json');
-        
-        try {
-            $file = $_FILES['file'];
-            $uploadDir = 'storage/';
-            $allowedTypes = [
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-                'application/pdf' => 'pdf',
-                'text/plain' => 'txt',
-                'application/msword' => 'doc',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx'
-            ];
-            $maxFileSize = 10 * 1024 * 1024; // 10MB
-
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
-            // Check for upload errors
-            if ($file['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception(match($file['error']) {
-                    UPLOAD_ERR_INI_SIZE => "File exceeds server's upload_max_filesize",
-                    UPLOAD_ERR_FORM_SIZE => "File exceeds form's MAX_FILE_SIZE",
-                    UPLOAD_ERR_PARTIAL => "File was only partially uploaded",
-                    UPLOAD_ERR_NO_FILE => "No file was uploaded",
-                    UPLOAD_ERR_NO_TMP_DIR => "Missing temporary folder",
-                    UPLOAD_ERR_CANT_WRITE => "Failed to write file to disk",
-                    UPLOAD_ERR_EXTENSION => "File upload stopped by PHP extension",
-                    default => "Unknown upload error"
-                });
-            }
-            
-            // Validate file type
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $fileType = $finfo->file($file['tmp_name']);
-            if (!array_key_exists($fileType, $allowedTypes)) {
-                throw new Exception("File type not allowed. Allowed types: JPG, PNG, PDF, TXT, DOC, DOCX");
-            }
-            
-            // Validate file size
-            if ($file['size'] > $maxFileSize) {
-                throw new Exception("File size exceeds maximum allowed (10MB).");
-            }
-            
-            // Sanitize filename
-            $originalName = basename($file['name']);
-            $extension = $allowedTypes[$fileType];
-            $safeName = uniqid() . '.' . $extension;
-            $destination = $uploadDir . $safeName;
-            
-            // Move uploaded file to storage
-            if (!move_uploaded_file($file['tmp_name'], $destination)) {
-                throw new Exception("Failed to move uploaded file.");
-            }
-            
-            // Store file info in database
-            $stmt = $connection->prepare("INSERT INTO files (filename, filepath, size, type) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssis", $originalName, $destination, $file['size'], $fileType);
-            
-            if ($stmt->execute()) {
-                $fileId = $stmt->insert_id;
-                $stmt->close();
-                
-                // Get the newly uploaded file to return as JSON
-                $stmt = $connection->prepare("SELECT id, filename, filepath, size, type FROM files WHERE id = ?");
-                $stmt->bind_param("i", $fileId);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $newFile = $result->fetch_assoc();
-                $stmt->close();
-                
-                // Format the file data
-                $formattedFile = [
-                    'id' => $newFile['id'],
-                    'name' => $newFile['filename'],
-                    'path' => $newFile['filepath'],
-                    'size' => formatSizeUnits($newFile['size']),
-                    'type' => $newFile['type'],
-                    'uploaded' => date('M j, Y'),
-                    'ext' => strtolower(pathinfo($newFile['filename'], PATHINFO_EXTENSION))
-                ];
-                
-                // echo json_encode([
-                //     'success' => true,
-                //     'message' => 'File uploaded successfully!',
-                //     'file' => $formattedFile
-                // ]);
-            } else {
-                throw new Exception("Failed to save file information to database.");
-            }
-        } catch (Exception $e) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'File upload error: ' . $e->getMessage()
-            ]);
-        }
-        exit();
-    }
-}
-
-// Get all tasks
-$tasks = [];
-$result = $connection->query("SELECT * FROM tasks ORDER BY FIELD(status, 'backlog', 'todo', 'in_progress', 'done'), deadline");
-if ($result) {
-    $tasks = $result->fetch_all(MYSQLI_ASSOC);
-    $result->free();
-}
-
-// Get team members
-$team_members = [];
-try {
-    $query = "SELECT u.user_id, u.full_name, pm.role FROM users u JOIN project_members pm ON u.user_id = pm.user_id";
-    $stmt = $connection->prepare($query);
-    if ($stmt->execute()) {
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $team_members[] = [
-                'id' => $row['user_id'],
-                'name' => $row['full_name'],
-                'role' => $row['role']
-            ];
-        }
-    }
-    $stmt->close();
-} catch (Exception $e) {
-    error_log("Database error: " . $e->getMessage());
-}
-
-// Calculate project progress
-$total_tasks = count($tasks);
-$completed_tasks = 0;
-foreach ($tasks as $task) {
-    if ($task['status'] === 'done') {
-        $completed_tasks++;
-    }
-}
-$progress = $total_tasks > 0 ? round(($completed_tasks / $total_tasks) * 100) : 0;
-
-// Get files from database
-$files = [];
-try {
-    $query = "SELECT id, filename, filepath, size, type, uploaded_at FROM files ORDER BY uploaded_at DESC";
-    $result = $connection->query($query);
-    while ($row = $result->fetch_assoc()) {
-        $files[] = [
-            'id' => $row['id'],
-            'name' => $row['filename'],
-            'path' => $row['filepath'],
-            'size' => formatSizeUnits($row['size']),
-            'type' => $row['type'],
-            'uploaded' => date('M j, Y', strtotime($row['uploaded_at']))
-        ];
-    }
-} catch (Exception $e) {
-    error_log("Database error: " . $e->getMessage());
-}
-
-function formatSizeUnits($bytes) {
-    if ($bytes >= 1073741824) {
-        return number_format($bytes / 1073741824, 2) . ' GB';
-    } elseif ($bytes >= 1048576) {
-        return number_format($bytes / 1048576, 2) . ' MB';
-    } elseif ($bytes >= 1024) {
-        return number_format($bytes / 1024, 2) . ' KB';
-    } elseif ($bytes > 1) {
-        return $bytes . ' bytes';
-    } elseif ($bytes == 1) {
-        return $bytes . ' byte';
-    }
-    return '0 bytes';
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -220,220 +9,8 @@ function formatSizeUnits($bytes) {
     <!-- SortableJS for drag and drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
     <style>
-/* File Repository Styles */
-.file-repository {
-    background: white;
-    border-radius: 8px;
-    padding: 25px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-    margin-bottom: 30px;
-}
-
-.file-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    flex-wrap: wrap;
-    gap: 15px;
-}
-
-.file-upload {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    background: #f8f9fa;
-    padding: 12px 20px;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-}
-
-.file-upload:hover {
-    background: #e9ecef;
-}
-
-.file-upload input[type="file"] {
-    display: none;
-}
-
-.file-upload label {
-    background: #007bff;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: inline-block;
-}
-
-.file-upload label:hover {
-    background: #0069d9;
-}
-
-.file-upload button {
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.file-upload button:hover {
-    background: #218838;
-}
-
-.file-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
-}
-
-.file-card {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 18px;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-}
-
-.file-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    border-color: #007bff;
-}
-
-.file-icon {
-    font-size: 42px;
-    text-align: center;
-    margin-bottom: 15px;
-    color: #6c757d;
-}
-
-.file-icon.pdf { color: #e74c3c; }
-.file-icon.image { color: #3498db; }
-.file-icon.doc { color: #2c3e50; }
-.file-icon.xls { color: #27ae60; }
-.file-icon.zip { color: #f39c12; }
-.file-icon.other { color: #9b59b6; }
-
-.file-name {
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 15px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.file-meta {
-    margin-top: auto;
-    font-size: 13px;
-    color: #6c757d;
-}
-
-.file-meta div {
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
-}
-
-.file-meta i {
-    margin-right: 8px;
-    width: 18px;
-    text-align: center;
-    color: #adb5bd;
-}
-
-.file-actions-bottom {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #eee;
-}
-
-.file-download {
-    color: #007bff;
-    text-decoration: none;
-    font-size: 13px;
-    display: inline-flex;
-    align-items: center;
-    transition: all 0.3s;
-}
-
-.file-download:hover {
-    color: #0056b3;
-    text-decoration: underline;
-}
-
-.file-delete {
-    color: #dc3545;
-    cursor: pointer;
-    font-size: 13px;
-    display: inline-flex;
-    align-items: center;
-    transition: all 0.3s;
-}
-
-.file-delete:hover {
-    color: #c82333;
-}
-
-.upload-message {
-    padding: 12px 15px;
-    border-radius: 4px;
-    margin: 10px 0;
-    font-size: 14px;
-}
-
-.upload-message.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.upload-message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .file-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
-    
-    .file-actions {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-
-@media (max-width: 480px) {
-    .file-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .file-upload {
-        width: 100%;
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-
-
-        /* Your existing CSS styles here */
-
-
-         /* Base Styles */
-         :root {
+        /* Base Styles */
+        :root {
             --primary-color: #3498db;
             --secondary-color: #2c3e50;
             --accent-color: #e74c3c;
@@ -463,7 +40,6 @@ function formatSizeUnits($bytes) {
             padding: 20px;
             padding-top: 100px;
             margin-right: 100px;
-            margin-bottom: 50px;
         }
         
         /* Header */
@@ -873,512 +449,566 @@ function formatSizeUnits($bytes) {
 </head>
 <body>
 <?php include("../Internees_task/header.php"); ?>
-
-<!-- Display messages -->
-<?php if (isset($_SESSION['message'])): ?>
-    <div class="alert alert-success"><?php echo $_SESSION['message']; unset($_SESSION['message']); ?></div>
-<?php endif; ?>
-<?php if (isset($_SESSION['error'])): ?>
-    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
-<?php endif; ?>
-
-<div class="container">
-    <!-- Dashboard Header -->
-    <div class="dashboard-header">
-        <h1 class="project-title">Website Redesign Project</h1>
-        <div class="project-actions">
-            <button class="btn btn-secondary">Export Report</button>
-            <button class="btn btn-primary">Share Project</button>
-        </div>
-    </div>
-    
-    <!-- Dashboard Grid -->
-    <div class="dashboard-grid">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Project Overview -->
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">Project Overview</h3>
-                <div class="project-meta">
-                    <div class="meta-item">
-                        <span class="meta-label">Status:</span>
-                        <span>In Progress</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Start Date:</span>
-                        <span>Jun 15, 2023</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">End Date:</span>
-                        <span>Sep 30, 2023</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Completion:</span>
-                        <span><?php echo $progress; ?>%</span>
-                    </div>
-                </div>
-                
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Team Members -->
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">Team Members</h3>
-                <div class="team-members">
-                    <?php foreach ($team_members as $member): ?>
-                        <div class="activity-item">
-                            <div class="activity-avatar" style="background-color: #<?php echo substr(md5($member['id']), 0, 6); ?>"></div>
-                            <div class="activity-content">
-                                <strong><?php echo htmlspecialchars($member['name']); ?></strong> (<?php echo htmlspecialchars($member['role']); ?>)
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            
-            <!-- Recent Activity -->
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">Recent Activity</h3>
-                <div class="activity-feed">
-                    <div class="activity-item">
-                        <div class="activity-avatar" style="background-color: #<?php echo substr(md5(2), 0, 6); ?>"></div>
-                        <div class="activity-content">
-                            <strong>John Smith</strong> completed task "Homepage layout"
-                            <div class="activity-time">2 hours ago</div>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-avatar" style="background-color: #<?php echo substr(md5(3), 0, 6); ?>"></div>
-                        <div class="activity-content">
-                            <strong>Emily Davis</strong> uploaded new file "design-specs.pdf"
-                            <div class="activity-time">5 hours ago</div>
-                        </div>
-                    </div>
-                </div>
+    <div class="container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1 class="project-title">Website Redesign Project</h1>
+            <div class="project-actions">
+                <button class="btn btn-secondary">Export Report</button>
+                <button class="btn btn-primary">Share Project</button>
             </div>
         </div>
         
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Kanban Board -->
-            <div class="kanban-board">
-                <div class="kanban-header">
-                    <h2>Task Management</h2>
-                    <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
-                </div>
-                
-                <div class="kanban-columns" id="kanbanBoard">
-                    <!-- Backlog Column -->
-                    <div class="kanban-column">
-                        <div class="column-header">
-                            <span>Backlog</span>
-                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'backlog'; })); ?></span>
-                        </div>
-                        <div class="task-list" id="backlog">
-                            <?php foreach ($tasks as $task): ?>
-                                <?php if ($task['status'] == 'backlog'): ?>
-                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
-                                        <div>
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
-                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
-                                        </div>
-                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
-                                        <div class="task-meta">
-                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
-                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    
-                    <!-- To Do Column -->
-                    <div class="kanban-column">
-                        <div class="column-header">
-                            <span>To Do</span>
-                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'todo'; })); ?></span>
-                        </div>
-                        <div class="task-list" id="todo">
-                            <?php foreach ($tasks as $task): ?>
-                                <?php if ($task['status'] == 'todo'): ?>
-                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
-                                        <div>
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
-                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
-                                        </div>
-                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
-                                        <div class="task-meta">
-                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
-                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    
-                    <!-- In Progress Column -->
-                    <div class="kanban-column">
-                        <div class="column-header">
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Project Overview -->
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Project Overview</h3>
+                    <div class="project-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Status:</span>
                             <span>In Progress</span>
-                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'in_progress'; })); ?></span>
                         </div>
-                        <div class="task-list" id="inProgress">
-                            <?php foreach ($tasks as $task): ?>
-                                <?php if ($task['status'] == 'in_progress'): ?>
-                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
-                                        <div>
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
-                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
-                                        </div>
-                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
-                                        <div class="task-meta">
-                                            <span>Due: <?php echo htmlspecialchars($task['deadline']); ?></span>
-                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
+                        <div class="meta-item">
+                            <span class="meta-label">Start Date:</span>
+                            <span>Jun 15, 2023</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">End Date:</span>
+                            <span>Sep 30, 2023</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Project Manager:</span>
+                            <span>Sarah Johnson</span>
                         </div>
                     </div>
                     
-                    <!-- Done Column -->
-                    <div class="kanban-column">
-                        <div class="column-header">
-                            <span>Done</span>
-                            <span class="task-count"><?php echo count(array_filter($tasks, function($t) { return $t['status'] == 'done'; })); ?></span>
+                    <div class="progress-container">
+                        <div class="meta-item">
+                            <span class="meta-label">Completion:</span>
+                            <span>65%</span>
                         </div>
-                        <div class="task-list" id="done">
-                            <?php foreach ($tasks as $task): ?>
-                                <?php if ($task['status'] == 'done'): ?>
-                                    <div class="task-card" draggable="true" data-task-id="<?php echo $task['id']; ?>">
-                                        <div>
-                                            <span class="task-priority priority-<?php echo $task['priority']; ?>"></span>
-                                            <span class="task-priority-text"><?php echo ucfirst($task['priority']); ?></span>
-                                        </div>
-                                        <h4 class="task-title"><?php echo htmlspecialchars($task['title']); ?></h4>
-                                        <div class="task-meta">
-                                            <span>Completed: <?php echo date('M j, Y', strtotime($task['updated_at'] ?? $task['created_at'])); ?></span>
-                                            <div class="task-assignee" style="background-color: #<?php echo substr(md5($task['assignee_id']), 0, 6); ?>"></div>
-                                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 65%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Team Members -->
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Team Members</h3>
+                    <div class="team-members">
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>Sarah Johnson</strong> (Manager)
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>John Smith</strong> (Developer)
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>Emily Davis</strong> (Designer)
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>Michael Brown</strong> (QA)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Recent Activity</h3>
+                    <div class="activity-feed">
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>John Smith</strong> completed task "Homepage layout"
+                                <div class="activity-time">2 hours ago</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>Emily Davis</strong> uploaded new file "design-specs.pdf"
+                                <div class="activity-time">5 hours ago</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-avatar"></div>
+                            <div class="activity-content">
+                                <strong>Sarah Johnson</strong> updated project timeline
+                                <div class="activity-time">Yesterday</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Kanban Board -->
+                <div class="kanban-board">
+                    <div class="kanban-header">
+                        <h2>Task Management</h2>
+                        <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
+                    </div>
+                    
+                    <div class="kanban-columns" id="kanbanBoard">
+                        <!-- Backlog Column -->
+                        <div class="kanban-column">
+                            <div class="column-header">
+                                <span>Backlog</span>
+                                <span class="task-count">3</span>
+                            </div>
+                            <div class="task-list" id="backlog">
+                                <div class="task-card" draggable="true">
+                                    <div>
+                                        <span class="task-priority priority-high"></span>
+                                        <span class="task-priority-text">High</span>
                                     </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
+                                    <h4 class="task-title">Implement user authentication</h4>
+                                    <div class="task-meta">
+                                        <span>Due: Jul 15</span>
+                                        <div class="task-assignee"></div>
+                                    </div>
+                                </div>
+                                <div class="task-card" draggable="true">
+                                    <div>
+                                        <span class="task-priority priority-medium"></span>
+                                        <span class="task-priority-text">Medium</span>
+                                    </div>
+                                    <h4 class="task-title">Create database schema</h4>
+                                    <div class="task-meta">
+                                        <span>Due: Jul 20</span>
+                                        <div class="task-assignee"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- To Do Column -->
+                        <div class="kanban-column">
+                            <div class="column-header">
+                                <span>To Do</span>
+                                <span class="task-count">5</span>
+                            </div>
+                            <div class="task-list" id="todo">
+                                <div class="task-card" draggable="true">
+                                    <div>
+                                        <span class="task-priority priority-high"></span>
+                                        <span class="task-priority-text">High</span>
+                                    </div>
+                                    <h4 class="task-title">Design homepage layout</h4>
+                                    <div class="task-meta">
+                                        <span>Due: Jul 10</span>
+                                        <div class="task-assignee"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- In Progress Column -->
+                        <div class="kanban-column">
+                            <div class="column-header">
+                                <span>In Progress</span>
+                                <span class="task-count">2</span>
+                            </div>
+                            <div class="task-list" id="inProgress">
+                                <div class="task-card" draggable="true">
+                                    <div>
+                                        <span class="task-priority priority-medium"></span>
+                                        <span class="task-priority-text">Medium</span>
+                                    </div>
+                                    <h4 class="task-title">Develop product API</h4>
+                                    <div class="task-meta">
+                                        <span>Due: Jul 25</span>
+                                        <div class="task-assignee"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Done Column -->
+                        <div class="kanban-column">
+                            <div class="column-header">
+                                <span>Done</span>
+                                <span class="task-count">4</span>
+                            </div>
+                            <div class="task-list" id="done">
+                                <div class="task-card" draggable="true">
+                                    <div>
+                                        <span class="task-priority priority-low"></span>
+                                        <span class="task-priority-text">Low</span>
+                                    </div>
+                                    <h4 class="task-title">Project setup</h4>
+                                    <div class="task-meta">
+                                        <span>Completed: Jun 20</span>
+                                        <div class="task-assignee"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+                
+                <!-- File Repository -->
+                <div class="file-repository">
+                    <div class="file-actions">
+                        <h2>File Repository</h2>
+                        <div class="file-upload">
+                            <button class="btn btn-primary">Upload File</button>
+                            <input type="file" multiple>
+                        </div>
+                    </div>
+                    
+                    <div class="file-grid">
+                        <div class="file-card">
+                            <div class="file-icon">📄</div>
+                            <h4 class="file-name">Project Requirements.pdf</h4>
+                            <div class="file-meta">
+                                <div>Uploaded: Jun 10, 2023</div>
+                                <div>Version: 1.2</div>
+                                <div>Size: 2.4 MB</div>
+                            </div>
+                        </div>
+                        <div class="file-card">
+                            <div class="file-icon">🎨</div>
+                            <h4 class="file-name">Design Mockups.sketch</h4>
+                            <div class="file-meta">
+                                <div>Uploaded: Jun 15, 2023</div>
+                                <div>Version: 3.1</div>
+                                <div>Size: 8.7 MB</div>
+                            </div>
+                        </div>
+                        <div class="file-card">
+                            <div class="file-icon">📊</div>
+                            <h4 class="file-name">Project Timeline.xlsx</h4>
+                            <div class="file-meta">
+                                <div>Uploaded: Jun 18, 2023</div>
+                                <div>Version: 2.0</div>
+                                <div>Size: 1.1 MB</div>
+                            </div>
+                        </div>
+                        <div class="file-card">
+                            <div class="file-icon">📝</div>
+                            <h4 class="file-name">Meeting Notes.docx</h4>
+                            <div class="file-meta">
+                                <div>Uploaded: Jun 22, 2023</div>
+                                <div>Version: 1.0</div>
+                                <div>Size: 0.5 MB</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Project Timeline & Reporting -->
+                <div class="project-timeline">
+                    <h2>Project Timeline</h2>
+                    <div class="gantt-chart" id="ganttChart">
+                        <!-- Gantt chart will be rendered here -->
+                    </div>
+                </div>
+                
+                <div class="reporting-section">
+                    <h2>Project Reports</h2>
+                    <div class="chart-container">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
             </div>
-
-           
-            <div class="file-repository">
-    <div class="file-actions">
-        <h2>File Repository</h2>
-        
-        <?php if (isset($_SESSION['message'])): ?>
-            <div class="upload-message success">
-                <?php echo htmlspecialchars($_SESSION['message']); unset($_SESSION['message']); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['error'])): ?>
-            <div class="upload-message error">
-                <?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
-            </div>
-        <?php endif; ?>
-        
-        <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST" enctype="multipart/form-data" class="file-upload-form">
-            <div class="file-upload">
-                <input type="file" name="file" id="file-upload-input" required>
-                <label for="file-upload-input">Choose File</label>
-                <span id="file-name-display">No file chosen</span>
-                <button type="submit" class="btn-upload">Upload</button>
-            </div>
-        </form>
+        </div>
     </div>
     
-    <?php if (!empty($files)): ?>
-        <div class="file-grid">
-            <?php foreach ($files as $file): 
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                $iconClass = 'other';
-                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'svg'])) $iconClass = 'image';
-                elseif (in_array($ext, ['pdf'])) $iconClass = 'pdf';
-                elseif (in_array($ext, ['doc', 'docx'])) $iconClass = 'doc';
-                elseif (in_array($ext, ['xls', 'xlsx', 'csv'])) $iconClass = 'xls';
-                elseif (in_array($ext, ['zip', 'rar', 'tar', 'gz'])) $iconClass = 'zip';
-            ?>
-                <div class="file-card">
-                    <div class="file-icon <?php echo $iconClass; ?>">
-                        <?php 
-                        if ($iconClass == 'image') echo '🖼️';
-                        elseif ($iconClass == 'pdf') echo '📕';
-                        elseif ($iconClass == 'doc') echo '📄';
-                        elseif ($iconClass == 'xls') echo '📊';
-                        elseif ($iconClass == 'zip') echo '🗄️';
-                        else echo '📁';
-                        ?>
-                    </div>
-                    <h4 class="file-name" title="<?php echo htmlspecialchars($file['name']); ?>">
-                        <?php echo htmlspecialchars($file['name']); ?>
-                    </h4>
-                    <div class="file-meta">
-                        <div><i>📅</i> <?php echo htmlspecialchars($file['uploaded']); ?></div>
-                        <div><i>📏</i> <?php echo htmlspecialchars($file['size']); ?></div>
-                        <div><i>🆔</i> <?php echo strtoupper($ext); ?> file</div>
-                    </div>
-                    <div class="file-actions-bottom">
-                        <a href="download.php?id=<?php echo $file['id']; ?>" class="file-download">
-                            <i>⬇️</i> Download
-                        </a>
-                        <a href="delete_file.php?id=<?php echo $file['id']; ?>" class="file-delete" onclick="return confirm('Are you sure you want to delete this file?')">
-                            <i>🗑️</i> Delete
-                        </a>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php else: ?>
-        <div class="empty-state">
-            <div class="empty-icon">📁</div>
-            <h3>No files uploaded yet</h3>
-            <p>Upload your first file using the form above</p>
-        </div>
-    <?php endif; ?>
-</div>
-    
-
-            
-            <!-- Project Timeline & Reporting -->
-            <div class="project-timeline">
-                <h2>Project Timeline</h2>
-                <div class="gantt-chart" id="ganttChart">
-                    <div style="display: flex; height: 100%; padding: 20px; flex-direction: column; gap: 15px;">
-                        <div style="margin-bottom: 5px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>Planning</span>
-                                <span>Jun 15 - Jun 25</span>
-                            </div>
-                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
-                                <div style="height: 100%; width: 100%; background: #2ecc71;"></div>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 5px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>Design</span>
-                                <span>Jun 20 - Jul 10</span>
-                            </div>
-                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
-                                <div style="height: 100%; width: 85%; background: #3498db;"></div>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 5px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>Development</span>
-                                <span>Jul 1 - Aug 15</span>
-                            </div>
-                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
-                                <div style="height: 100%; width: 65%; background: #3498db;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Task Modal -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Task</h3>
+                <button class="close-modal" onclick="closeModal()">×</button>
             </div>
             
-            <div class="reporting-section">
-                <h2>Project Reports</h2>
-                <div class="chart-container">
-                    <canvas id="progressChart"></canvas>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label for="taskTitle">Task Title</label>
+                    <input type="text" id="taskTitle" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskDescription">Description</label>
+                    <textarea id="taskDescription" class="form-control" rows="4"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskPriority">Priority</label>
+                    <select id="taskPriority" class="form-control">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskAssignee">Assignee</label>
+                    <select id="taskAssignee" class="form-control">
+                        <option value="">Unassigned</option>
+                        <option value="1">Sarah Johnson</option>
+                        <option value="2">John Smith</option>
+                        <option value="3">Emily Davis</option>
+                        <option value="4">Michael Brown</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskDeadline">Deadline</label>
+                    <input type="date" id="taskDeadline" class="form-control">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- File Preview Modal -->
+    <div class="modal" id="fileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>File Preview</h3>
+                <button class="close-modal" onclick="closeModal()">×</button>
+            </div>
+            
+            <div class="file-preview-content">
+                <div class="file-preview-header">
+                    <div class="file-icon-lg">📄</div>
+                    <div>
+                        <h4 id="fileName">Document.pdf</h4>
+                        <div class="file-meta">
+                            <span id="fileVersion">Version: 1.0</span>
+                            <span id="fileSize">Size: 2.4 MB</span>
+                            <span id="fileUploadDate">Uploaded: Jun 10, 2023</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="version-history">
+                    <h5>Version History</h5>
+                    <ul class="version-list">
+                        <li>
+                            <span>Version 1.2</span>
+                            <span>Jun 15, 2023</span>
+                            <span>2.4 MB</span>
+                            <button class="btn btn-sm">Download</button>
+                        </li>
+                        <li>
+                            <span>Version 1.1</span>
+                            <span>Jun 12, 2023</span>
+                            <span>2.1 MB</span>
+                            <button class="btn btn-sm">Download</button>
+                        </li>
+                        <li>
+                            <span>Version 1.0</span>
+                            <span>Jun 10, 2023</span>
+                            <span>2.0 MB</span>
+                            <button class="btn btn-sm">Download</button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="file-actions">
+                    <button class="btn btn-primary">Download Current</button>
+                    <button class="btn btn-secondary">Upload New Version</button>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Task Modal -->
-<div class="modal" id="taskModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Create New Task</h3>
-            <button class="close-modal" onclick="closeModal()">×</button>
-        </div>
+    <script>
+        // Initialize Kanban Board Drag and Drop
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize SortableJS for kanban columns
+            new Sortable(document.getElementById('backlog'), {
+                group: 'tasks',
+                animation: 150,
+                ghostClass: 'dragging-task'
+            });
+            
+            new Sortable(document.getElementById('todo'), {
+                group: 'tasks',
+                animation: 150,
+                ghostClass: 'dragging-task'
+            });
+            
+            new Sortable(document.getElementById('inProgress'), {
+                group: 'tasks',
+                animation: 150,
+                ghostClass: 'dragging-task'
+            });
+            
+            new Sortable(document.getElementById('done'), {
+                group: 'tasks',
+                animation: 150,
+                ghostClass: 'dragging-task'
+            });
+            
+            // Initialize Charts
+            initProgressChart();
+            initGanttChart();
+            
+            // File card click event
+            document.querySelectorAll('.file-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    document.getElementById('fileModal').style.display = 'flex';
+                });
+            });
+            
+            // Task form submission
+            document.getElementById('taskForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createNewTask();
+                closeModal();
+            });
+        });
         
-        <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST">
-            <input type="hidden" name="create_task" value="1">
-            
-            <div class="form-group">
-                <label for="taskTitle">Task Title</label>
-                <input type="text" id="taskTitle" class="form-control" name="title" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="taskDescription">Description</label>
-                <textarea id="taskDescription" name="description" class="form-control" rows="4"></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="taskPriority">Priority</label>
-                <select id="taskPriority" class="form-control" name="priority">
-                    <option value="high">High</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="taskStatus">Status</label>
-                <select id="taskStatus" class="form-control" name="status">
-                    <option value="backlog" selected>Backlog</option>
-                    <option value="todo">To Do</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="done">Done</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="taskAssignee">Assignee</label>
-                <select id="taskAssignee" class="form-control" name="assignee_id">
-                    <option value="">Unassigned</option>
-                    <?php foreach ($team_members as $member): ?>
-                        <option value="<?php echo $member['id']; ?>"><?php echo htmlspecialchars($member['name']); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="taskDeadline">Deadline</label>
-                <input type="date" id="taskDeadline" name="deadline" class="form-control">
-            </div>
-            
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create Task</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-// Initialize Kanban Board Drag and Drop
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize SortableJS for kanban columns
-    new Sortable(document.getElementById('backlog'), {
-        group: 'tasks',
-        animation: 150,
-        ghostClass: 'dragging-task',
-        onEnd: function(evt) {
-            updateTaskStatus(evt.item.dataset.taskId, 'backlog');
+        // Modal Functions
+        function openTaskModal() {
+            document.getElementById('taskModal').style.display = 'flex';
         }
-    });
-    
-    new Sortable(document.getElementById('todo'), {
-        group: 'tasks',
-        animation: 150,
-        ghostClass: 'dragging-task',
-        onEnd: function(evt) {
-            updateTaskStatus(evt.item.dataset.taskId, 'todo');
+        
+        function closeModal() {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
         }
-    });
-    
-    new Sortable(document.getElementById('inProgress'), {
-        group: 'tasks',
-        animation: 150,
-        ghostClass: 'dragging-task',
-        onEnd: function(evt) {
-            updateTaskStatus(evt.item.dataset.taskId, 'in_progress');
+        
+        // Create New Task
+        function createNewTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const priority = document.getElementById('taskPriority').value;
+            const assigneeId = document.getElementById('taskAssignee').value;
+            const deadline = document.getElementById('taskDeadline').value;
+            
+            // In a real app, you would add to your data model and update UI
+            const taskHtml = `
+                <div class="task-card" draggable="true">
+                    <div>
+                        <span class="task-priority priority-${priority}"></span>
+                        <span class="task-priority-text">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                    </div>
+                    <h4 class="task-title">${title}</h4>
+                    <div class="task-meta">
+                        <span>${deadline ? 'Due: ' + formatDate(deadline) : 'No deadline'}</span>
+                        <div class="task-assignee"></div>
+                    </div>
+                </div>
+            `;
+            
+            // Add to backlog column
+            document.getElementById('backlog').insertAdjacentHTML('beforeend', taskHtml);
+            
+            // Update task count
+            updateTaskCounts();
+            
+            // Reset form
+            document.getElementById('taskForm').reset();
         }
-    });
-    
-    new Sortable(document.getElementById('done'), {
-        group: 'tasks',
-        animation: 150,
-        ghostClass: 'dragging-task',
-        onEnd: function(evt) {
-            updateTaskStatus(evt.item.dataset.taskId, 'done');
+        
+        function updateTaskCounts() {
+            const columns = ['backlog', 'todo', 'inProgress', 'done'];
+            columns.forEach(col => {
+                const count = document.getElementById(col).children.length;
+                document.querySelector(`#${col} + .column-header .task-count`).textContent = count;
+            });
         }
-    });
-    
-    // Initialize Charts
-    initProgressChart();
-});
-
-function updateTaskStatus(taskId, newStatus) {
-    fetch('update_task.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'task_id=' + taskId + '&status=' + newStatus
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            alert('Failed to update task status');
-        }
-    });
-}
-
-function initProgressChart() {
-    const ctx = document.getElementById('progressChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['Planning', 'Design', 'Development', 'Testing', 'Deployment'],
-            datasets: [{
-                label: 'Completion %',
-                data: [100, 85, 65, 30, 5],
-                backgroundColor: [
-                    '#2ecc71',
-                    '#3498db',
-                    '#3498db',
-                    '#f39c12',
-                    '#e74c3c'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100
+        
+        // Chart Initialization
+        function initProgressChart() {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Planning', 'Design', 'Development', 'Testing', 'Deployment'],
+                    datasets: [{
+                        label: 'Completion %',
+                        data: [100, 85, 65, 30, 5],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#3498db',
+                            '#3498db',
+                            '#f39c12',
+                            '#e74c3c'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
                 }
-            }
+            });
         }
-    });
-}
-
-// Modal Functions
-function openTaskModal() {
-    document.getElementById('taskModal').style.display = 'flex';
-}
-
-function closeModal() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.style.display = 'none';
-    });
-}
-
-document.getElementById('file-upload-input').addEventListener('change', function(e) {
-    const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-    document.getElementById('file-name-display').textContent = fileName;
-});
-
-
-
-
-
-
-
-
-
-
-</script>
+        
+        function initGanttChart() {
+            // In a real app, you would use a proper Gantt chart library
+            // This is a simplified visualization
+            const ganttData = [
+                { task: 'Planning', start: '2023-06-15', end: '2023-06-25', progress: 100 },
+                { task: 'Design', start: '2023-06-20', end: '2023-07-10', progress: 85 },
+                { task: 'Development', start: '2023-07-01', end: '2023-08-15', progress: 65 },
+                { task: 'Testing', start: '2023-08-10', end: '2023-09-01', progress: 30 },
+                { task: 'Deployment', start: '2023-09-01', end: '2023-09-15', progress: 5 }
+            ];
+            
+            // Simplified rendering for demo
+            const ganttChart = document.getElementById('ganttChart');
+            ganttChart.innerHTML = `
+                <div style="display: flex; height: 100%; padding: 20px; flex-direction: column; gap: 15px;">
+                    ${ganttData.map(item => `
+                        <div style="margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>${item.task}</span>
+                                <span>${formatDate(item.start)} - ${formatDate(item.end)}</span>
+                            </div>
+                            <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden;">
+                                <div style="height: 100%; width: ${item.progress}%; background: ${getProgressColor(item.progress)};"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function getProgressColor(progress) {
+            if (progress > 80) return '#2ecc71';
+            if (progress > 50) return '#3498db';
+            if (progress > 20) return '#f39c12';
+            return '#e74c3c';
+        }
+        
+        function formatDate(dateString) {
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('en-US', options);
+        }
+    </script>
 </body>
 </html>
