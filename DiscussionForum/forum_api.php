@@ -545,4 +545,84 @@ function notifySubscribers($topic_id, $user_id, $reply_id) {
     // In a real implementation, this would send notifications to subscribers
     return ['success' => true];
 }
+
+
+// Add to forum_api.php after existing functions
+
+function updateTopic($data) {
+    global $conn;
+    
+    $topic_id = intval($data['topic_id']);
+    $title = trim($conn->real_escape_string($data['title']));
+    $content = trim($conn->real_escape_string($data['content']));
+    
+    if (empty($title) || empty($content)) {
+        throw new Exception('Title and content are required');
+    }
+    
+    $stmt = $conn->prepare("UPDATE forum_topics SET title = ?, content = ?, updated_at = NOW() WHERE topic_id = ?");
+    $stmt->bind_param("ssi", $title, $content, $topic_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to update topic');
+    }
+    
+    return ['success' => true, 'message' => 'Topic updated successfully'];
+}
+
+function updateReply($data) {
+    global $conn;
+    
+    $reply_id = intval($data['reply_id']);
+    $content = trim($conn->real_escape_string($data['content']));
+    
+    if (empty($content)) {
+        throw new Exception('Content is required');
+    }
+    
+    $stmt = $conn->prepare("UPDATE forum_replies SET content = ?, updated_at = NOW() WHERE reply_id = ?");
+    $stmt->bind_param("si", $content, $reply_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to update reply');
+    }
+    
+    return ['success' => true, 'message' => 'Reply updated successfully'];
+}
+
+function deleteTopic($data) {
+    global $conn;
+    
+    $topic_id = intval($data['topic_id']);
+    
+    // First delete all replies
+    $stmt = $conn->prepare("DELETE FROM forum_replies WHERE topic_id = ?");
+    $stmt->bind_param("i", $topic_id);
+    $stmt->execute();
+    
+    // Then delete the topic
+    $stmt = $conn->prepare("DELETE FROM forum_topics WHERE topic_id = ?");
+    $stmt->bind_param("i", $topic_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to delete topic');
+    }
+    
+    return ['success' => true, 'message' => 'Topic deleted successfully'];
+}
+
+function deleteReply($data) {
+    global $conn;
+    
+    $reply_id = intval($data['reply_id']);
+    
+    $stmt = $conn->prepare("DELETE FROM forum_replies WHERE reply_id = ?");
+    $stmt->bind_param("i", $reply_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to delete reply');
+    }
+    
+    return ['success' => true, 'message' => 'Reply deleted successfully'];
+}
 ?>

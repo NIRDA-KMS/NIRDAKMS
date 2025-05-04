@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3307
--- Generation Time: Apr 30, 2025 at 10:41 AM
+-- Generation Time: May 04, 2025 at 10:15 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -50,6 +50,19 @@ INSERT INTO `attendees` (`attendee_id`, `event_id`, `email`, `name`, `rsvp_statu
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `blocked_users`
+--
+
+CREATE TABLE `blocked_users` (
+  `block_id` int(11) NOT NULL,
+  `blocker_id` int(11) NOT NULL,
+  `blocked_id` int(11) NOT NULL,
+  `blocked_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `chat_groups`
 --
 
@@ -81,7 +94,8 @@ INSERT INTO `chat_groups` (`group_id`, `group_name`, `description`, `created_by`
 (11, 'welcome', 'nice', 12, '2025-04-30 01:23:14', '2025-04-30 01:23:14', 1),
 (12, 'welcome', '', 11, '2025-04-30 01:38:25', '2025-04-30 01:38:25', 1),
 (13, 'NIRDA GROUP', 'NIRDA TEAM WORK', 11, '2025-04-30 07:52:19', '2025-04-30 07:52:34', 1),
-(14, 'shsjs', '', 11, '2025-04-30 08:08:06', '2025-04-30 08:08:17', 1);
+(14, 'shsjs', '', 11, '2025-04-30 08:08:06', '2025-04-30 08:08:17', 1),
+(15, 'ssss', 'ss', 11, '2025-05-04 20:14:18', '2025-05-04 20:14:18', 1);
 
 -- --------------------------------------------------------
 
@@ -242,7 +256,8 @@ INSERT INTO `group_members` (`member_id`, `group_id`, `user_id`, `joined_at`, `i
 (11, 11, 12, '2025-04-30 01:23:14', 1),
 (12, 12, 11, '2025-04-30 01:38:25', 1),
 (13, 13, 11, '2025-04-30 07:52:19', 1),
-(14, 14, 11, '2025-04-30 08:08:06', 1);
+(14, 14, 11, '2025-04-30 08:08:06', 1),
+(15, 15, 11, '2025-05-04 20:14:18', 1);
 
 -- --------------------------------------------------------
 
@@ -368,6 +383,22 @@ INSERT INTO `schedule_events` (`event_id`, `eventTitle`, `startDateTime`, `endin
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `starred_conversations`
+--
+
+CREATE TABLE `starred_conversations` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `conversation_id` int(11) DEFAULT NULL,
+  `group_id` int(11) DEFAULT NULL,
+  `is_starred` tinyint(1) DEFAULT 1,
+  `starred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `unstarred_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
@@ -403,7 +434,7 @@ INSERT INTO `users` (`user_id`, `username`, `email`, `password`, `full_name`, `r
 (8, 'Yves', 'yves.niy@example.com', '$2y$10$NpFJz8zR4nZ0bUZK4OFE1u4VBMv88JUNX6YHcRMF5bUJ2r59mjPiG', 'NIYONSENGA Yves', 1, 'Quality Assurance', '2', 'QA Monitoring', '0788888886', 'Kinyarwanda', 1, '2025-04-09 22:50:00', '2025-04-09 23:15:00'),
 (9, 'Carine', 'carine.k@example.com', '$2y$10$Re0H7xI5OfUOj7sRZ1UdeOTaLS4rF2Uj5u3YZCQN3vly4MPnAMZJq', 'KABANDA Carine', 3, 'Finance and Planning', '2', 'Budget Unit', '0788888887', 'English', 1, '2025-03-22 00:40:00', '2025-03-22 01:10:00'),
 (10, 'Elie', 'elie.m@example.com', '$2y$10$gXoCMUvUM9H1j8jVL3xJHO8uMe98a/1vU8VvZ57qJ6jF2rqL3PzK2', 'MUKIZA Elie', 2, 'Logistics & Operations', '3', 'Fleet Services', '0788888888', 'French', 1, '2025-03-30 02:10:00', '2025-03-30 02:40:00'),
-(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-04-30 08:02:56'),
+(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-04 20:13:40'),
 (12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-04-30 00:20:56');
 
 -- --------------------------------------------------------
@@ -427,6 +458,14 @@ CREATE TABLE `user_status` (
 --
 ALTER TABLE `attendees`
   ADD PRIMARY KEY (`attendee_id`);
+
+--
+-- Indexes for table `blocked_users`
+--
+ALTER TABLE `blocked_users`
+  ADD PRIMARY KEY (`block_id`),
+  ADD UNIQUE KEY `unique_block` (`blocker_id`,`blocked_id`),
+  ADD KEY `blocked_id` (`blocked_id`);
 
 --
 -- Indexes for table `chat_groups`
@@ -467,6 +506,15 @@ ALTER TABLE `projects`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `starred_conversations`
+--
+ALTER TABLE `starred_conversations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_star` (`user_id`,`conversation_id`,`group_id`),
+  ADD KEY `conversation_id` (`conversation_id`),
+  ADD KEY `group_id` (`group_id`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
@@ -489,16 +537,22 @@ ALTER TABLE `attendees`
   MODIFY `attendee_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
+-- AUTO_INCREMENT for table `blocked_users`
+--
+ALTER TABLE `blocked_users`
+  MODIFY `block_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `chat_groups`
 --
 ALTER TABLE `chat_groups`
-  MODIFY `group_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `group_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `group_members`
 --
 ALTER TABLE `group_members`
-  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -519,6 +573,12 @@ ALTER TABLE `projects`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `starred_conversations`
+--
+ALTER TABLE `starred_conversations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
@@ -527,6 +587,13 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `blocked_users`
+--
+ALTER TABLE `blocked_users`
+  ADD CONSTRAINT `fk_blocked_user` FOREIGN KEY (`blocked_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_blocker_user` FOREIGN KEY (`blocker_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `chat_groups`
@@ -555,6 +622,14 @@ ALTER TABLE `messages`
 ALTER TABLE `private_conversations`
   ADD CONSTRAINT `fk_conversation_user1` FOREIGN KEY (`user1_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_conversation_user2` FOREIGN KEY (`user2_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `starred_conversations`
+--
+ALTER TABLE `starred_conversations`
+  ADD CONSTRAINT `fk_starred_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `private_conversations` (`conversation_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_starred_group` FOREIGN KEY (`group_id`) REFERENCES `chat_groups` (`group_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_starred_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `user_status`

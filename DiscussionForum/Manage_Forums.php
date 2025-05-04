@@ -1,10 +1,6 @@
 <?php
-// session_start();
 require_once('../SchedureEvent/connect.php');
-
- require_once __DIR__ . '/../Internees_task/auth/auth_check.php'; 
-//  include __DIR__ . '/../Internees_task/login_success_popup.php';
-
+require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
 ?>
 
 <!DOCTYPE html>
@@ -245,7 +241,68 @@ require_once('../SchedureEvent/connect.php');
         .mod-btn:hover {
             color: #3498db;
         }
+        
+         /* Add to your existing CSS */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
 
+.modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    width: 80%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 22px;
+}
+
+/* Edit form styles */
+.edit-form {
+    margin-top: 20px;
+}
+
+.edit-form .form-group {
+    margin-bottom: 15px;
+}
+
+.edit-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.edit-form input[type="text"],
+.edit-form textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.edit-form textarea {
+    min-height: 150px;
+}
+
+
+        
         /* Status Toggle Styles */
         .status-toggle {
             display: flex;
@@ -551,7 +608,7 @@ require_once('../SchedureEvent/connect.php');
             <form id="topicForm">
                 <div class="form-group">
                     <label for="topicCategory">Category</label>
-                    <select id="topicCategory">
+                    <select id="topicCategory" required>
                         <option value="">Select a category</option>
                         <!-- Categories will be loaded via API -->
                     </select>
@@ -598,6 +655,20 @@ require_once('../SchedureEvent/connect.php');
         </div>
     </div>
     
+    <!-- Edit Topic Modal -->
+    <div class="modal" id="editTopicModal" style="display: none;">
+        <div class="modal-content">
+            <!-- Content will be loaded dynamically -->
+        </div>
+    </div>
+    
+    <!-- Edit Reply Modal -->
+    <div class="modal" id="editReplyModal" style="display: none;">
+        <div class="modal-content">
+            <!-- Content will be loaded dynamically -->
+        </div>
+    </div>
+    
     <!-- Admin Panel Modal -->
     <div class="modal" id="reviewReportsModal">
         <div class="modal-content">
@@ -637,13 +708,20 @@ require_once('../SchedureEvent/connect.php');
         let currentUserRole = <?php echo isset($_SESSION['role_id']) ? $_SESSION['role_id'] : 0; ?>;
         let currentUserId = <?php echo isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0; ?>;
         let currentTopicId = null;
+        let currentTopicSubscribed = false;
         const API_BASE_URL = 'forum_api.php';
 
         // Document Ready Function
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize TinyMCE
-            initTinyMCE();
-            
+            // Initialize TinyMCE for create topic
+            tinymce.init({
+                selector: '#topicContent',
+                plugins: 'link lists code',
+                toolbar: 'bold italic | bullist numlist | link code',
+                menubar: false,
+                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
+            });
+
             // Initialize the application
             initApp();
             
@@ -657,19 +735,6 @@ require_once('../SchedureEvent/connect.php');
                 document.getElementById('moderationControls').style.display = 'block';
             }
         });
-
-        /**
-         * Initialize TinyMCE editor
-         */
-        function initTinyMCE() {
-            tinymce.init({
-                selector: '#topicContent',
-                plugins: 'link lists code',
-                toolbar: 'bold italic | bullist numlist | link code',
-                menubar: false,
-                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
-            });
-        }
 
         /**
          * Main application initialization
@@ -694,7 +759,11 @@ require_once('../SchedureEvent/connect.php');
             submitReplyBtn.addEventListener('click', handleReplySubmit);
             
             // Close modals when clicking outside
-            document.addEventListener('click', handleModalOutsideClick);
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('modal')) {
+                    e.target.style.display = 'none';
+                }
+            });
             
             // Admin tab switching
             setupAdminTabs();
@@ -836,10 +905,9 @@ require_once('../SchedureEvent/connect.php');
                     `;
                     document.getElementById('viewTopicContent').innerHTML = topic.content;
 
-                // Check subscription status
-                 currentTopicSubscribed = data.is_subscribed;
-                 updateSubscriptionButton();
-
+                    // Check subscription status
+                    currentTopicSubscribed = data.is_subscribed;
+                    updateSubscriptionButton();
                     
                     // Load replies
                     const repliesContainer = document.getElementById('topicReplies');
@@ -851,7 +919,12 @@ require_once('../SchedureEvent/connect.php');
                     subscriptionControls.innerHTML = `
                         <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
                         <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
-                        repliesContainer.appendChild(subscriptionControls);
+                    repliesContainer.appendChild(subscriptionControls);
+                    
+                    // Add event listeners for subscription buttons
+                    document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
+                    document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
+                    updateSubscriptionButton();
                     
                     if (data.replies.length === 0) {
                         repliesContainer.innerHTML += '<p>No replies yet.</p>';
@@ -884,9 +957,7 @@ require_once('../SchedureEvent/connect.php');
                             repliesContainer.appendChild(replyElement);
                         });
                     }
-                      // Add event listeners for subscription buttons
-                      document.getElementById('subscribeBtn')?.addEventListener('click', () => subscribeToTopic(topicId));
-                    document.getElementById('unsubscribeBtn')?.addEventListener('click', () => unsubscribeFromTopic(topicId));
+                    
                     document.getElementById('topicViewModal').style.display = 'flex';
                 })
                 .catch(error => {
@@ -894,7 +965,6 @@ require_once('../SchedureEvent/connect.php');
                     alert('Failed to load topic');
                 });
         }
-
 
         /**
          * Update subscription button visibility
@@ -909,7 +979,7 @@ require_once('../SchedureEvent/connect.php');
             }
         }
 
-         /**
+        /**
          * Subscribe to a topic
          */
         function subscribeToTopic(topicId) {
@@ -969,21 +1039,6 @@ require_once('../SchedureEvent/connect.php');
                 console.error('Error unsubscribing from topic:', error);
                 alert('Failed to unsubscribe');
             });
-        }
-
-        /**
-         * Notify subscribers (called when a new reply is posted)
-         */
-        function notifySubscribers(topicId, userId, replyId) {
-            // This would typically be handled server-side in a real application
-            console.log(`Notifying subscribers of new reply ${replyId} to topic ${topicId}`);
-            
-            // In a real implementation, this would:
-            // 1. Get list of subscribers from forum_subscriptions table
-            // 2. Send notifications (email, in-app, etc.)
-            // 3. Return success/failure status
-            
-            return Promise.resolve({ success: true });
         }
 
         /**
@@ -1053,15 +1108,15 @@ require_once('../SchedureEvent/connect.php');
          * Handle reply submission
          */
         function handleReplySubmit() {
+            if (!currentTopicId) {
+                alert('No topic selected. Please view a topic before replying.');
+                return;
+            }
+            
             const content = document.getElementById('replyContent').value;
             
             if (!content.trim()) {
                 alert('Please enter reply content');
-                return;
-            }
-            
-            if (!currentTopicId) {
-                alert('No topic selected');
                 return;
             }
             
@@ -1103,15 +1158,6 @@ require_once('../SchedureEvent/connect.php');
         }
 
         /**
-         * Handle modal outside click
-         */
-        function handleModalOutsideClick(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        }
-
-        /**
          * Setup admin tabs functionality
          */
         function setupAdminTabs() {
@@ -1141,16 +1187,186 @@ require_once('../SchedureEvent/connect.php');
          * Edit a topic
          */
         function editTopic(topicId) {
-            // In a real implementation, this would open an edit form
-            alert(`Edit functionality for topic ${topicId} would open an edit form`);
+            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    
+                    const topic = data.topic;
+                    const modalContent = `
+                        <h2>Edit Topic</h2>
+                        <form id="editTopicForm">
+                            <input type="hidden" id="editTopicId" value="${topicId}">
+                            <div class="form-group">
+                                <label for="editTopicTitle">Title</label>
+                                <input type="text" id="editTopicTitle" value="${topic.title}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editTopicContent">Content</label>
+                                <textarea id="editTopicContent" style="height: 300px;">${topic.content}</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('editTopicModal').style.display='none'">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    `;
+                    
+                    document.getElementById('editTopicModal').querySelector('.modal-content').innerHTML = modalContent;
+                    document.getElementById('editTopicModal').style.display = 'flex';
+                    
+                    // Initialize TinyMCE for edit
+                    tinymce.init({
+                        selector: '#editTopicContent',
+                        plugins: 'link lists code',
+                        toolbar: 'bold italic | bullist numlist | link code',
+                        menubar: false,
+                        content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
+                    });
+                    
+                    // Handle form submission
+                    document.getElementById('editTopicForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        saveTopicChanges(topicId);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading topic for edit:', error);
+                    alert('Failed to load topic for editing');
+                });
+        }
+
+        /**
+         * Save edited topic
+         */
+        function saveTopicChanges(topicId) {
+            const title = document.getElementById('editTopicTitle').value;
+            const content = tinymce.get('editTopicContent').getContent();
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'update_topic',
+                    topic_id: topicId,
+                    title: title,
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert('Topic updated successfully!');
+                document.getElementById('editTopicModal').style.display = 'none';
+                viewTopic(topicId); // Refresh the view
+                loadTopics(); // Update topic list
+            })
+            .catch(error => {
+                console.error('Error updating topic:', error);
+                alert('Failed to update topic');
+            });
         }
 
         /**
          * Edit a reply
          */
         function editReply(replyId, topicId) {
-            // In a real implementation, this would open an edit form
-            alert(`Edit functionality for reply ${replyId} in topic ${topicId}`);
+            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    
+                    // Find the reply
+                    const reply = data.replies.find(r => r.id == replyId);
+                    if (!reply) {
+                        alert('Reply not found');
+                        return;
+                    }
+                    
+                    const modalContent = `
+                        <h2>Edit Reply</h2>
+                        <form id="editReplyForm">
+                            <input type="hidden" id="editReplyId" value="${replyId}">
+                            <input type="hidden" id="editReplyTopicId" value="${topicId}">
+                            <div class="form-group">
+                                <label for="editReplyContent">Content</label>
+                                <textarea id="editReplyContent" style="height: 200px;">${reply.content}</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('editReplyModal').style.display='none'">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    `;
+                    
+                    document.getElementById('editReplyModal').querySelector('.modal-content').innerHTML = modalContent;
+                    document.getElementById('editReplyModal').style.display = 'flex';
+                    
+                    // Initialize TinyMCE for edit
+                    tinymce.init({
+                        selector: '#editReplyContent',
+                        plugins: 'link lists code',
+                        toolbar: 'bold italic | bullist numlist | link code',
+                        menubar: false,
+                        content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
+                    });
+                    
+                    // Handle form submission
+                    document.getElementById('editReplyForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        saveReplyChanges(replyId, topicId);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading reply for edit:', error);
+                    alert('Failed to load reply for editing');
+                });
+        }
+
+        /**
+         * Save edited reply
+         */
+        function saveReplyChanges(replyId, topicId) {
+            const content = tinymce.get('editReplyContent').getContent();
+            
+            fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'update_reply',
+                    reply_id: replyId,
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                alert('Reply updated successfully!');
+                document.getElementById('editReplyModal').style.display = 'none';
+                viewTopic(topicId); // Refresh the view
+            })
+            .catch(error => {
+                console.error('Error updating reply:', error);
+                alert('Failed to update reply');
+            });
         }
 
         /**
@@ -1382,7 +1598,6 @@ require_once('../SchedureEvent/connect.php');
          * Load user management content
          */
         function loadUserManagement() {
-            // In a real implementation, this would load user management UI
             document.getElementById('userManagementContent').innerHTML = `
                 <p>User management functionality would be implemented here.</p>
                 <div style="margin-top: 20px;">
@@ -1397,7 +1612,6 @@ require_once('../SchedureEvent/connect.php');
          * Load category management content
          */
         function loadCategoryManagement() {
-            // In a real implementation, this would load category management UI
             document.getElementById('categoryManagementContent').innerHTML = `
                 <p>Category management functionality would be implemented here.</p>
                 <div style="margin-top: 20px;">

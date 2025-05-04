@@ -835,7 +835,7 @@ if (isset($_GET['action'])) {
             display: flex;
             justify-content: space-between;
             white-space: nowrap;
-            overflow: hidden;
+            /* overflow: hidden; */
             text-overflow: ellipsis;
         }
         
