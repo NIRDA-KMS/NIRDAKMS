@@ -1,9 +1,6 @@
 <?php
 include('../SchedureEvent/connect.php');
 
-// Initialize response array
-$response = ['success' => false, 'message' => ''];
-
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get POST data
@@ -14,17 +11,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notifyTeam = isset($_POST['notifyTeam']) ? 1 : 0;
     $template = isset($_POST['template']) ? mysqli_real_escape_string($connection, $_POST['template']) : '';
 
-    // Process goals
-    $goals = [];
-    if (isset($_POST['goals']) && is_array($_POST['goals'])) {
-        foreach ($_POST['goals'] as $goal) {
-            if (!empty($goal['title'])) {
-                $goals[] = [
-                    'title' => mysqli_real_escape_string($connection, $goal['title']),
-                    'description' => mysqli_real_escape_string($connection, $goal['description'] ?? '')
-                ];
-            }
-        }
+    // Process first goal (stored in projects table)
+    $goalTitle = '';
+    $goalDescription = '';
+    if (isset($_POST['goals'][0]['title'])) {
+        $goalTitle = mysqli_real_escape_string($connection, $_POST['goals'][0]['title']);
+        $goalDescription = isset($_POST['goals'][0]['description']) ? mysqli_real_escape_string($connection, $_POST['goals'][0]['description']) : '';
     }
 
     // Process members
@@ -83,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             '$template',
                             '$startDate',
                             '$endDate',
-                            '" . (!empty($goals) ? $goals[0]['title'] : '') . "',
-                            '" . (!empty($goals) ? $goals[0]['description'] : '') . "',
+                            '$goalTitle',
+                            '$goalDescription',
                             NOW()
                         )";
         
@@ -96,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $projectId = mysqli_insert_id($connection);
         
-        // Insert team members
+        // Insert team members into project_members table
         foreach ($members as $member) {
             $memberQuery = "INSERT INTO project_members (
                                project_id, 
@@ -116,25 +108,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception('Failed to add team member: ' . mysqli_error($connection));
             }
         }
-        
     
         // Commit transaction
         mysqli_commit($connection);
         
         // Set success response
-        $response['success'] = true;
-        $response['project_id'] = $projectId;
-        $response['message'] = 'Project created successfully';
+        // $response['success'] = true;
+        // $response['project_id'] = $projectId;
+        // $response['message'] = 'Project created successfully';
+        header("Location:create_project.php");
         
         // Send notifications if requested
         if ($notifyTeam) {
             // Notification logic would go here
-            // You could email team members or create system notifications
         }
         
     } catch (Exception $e) {
         // Rollback transaction on error
         mysqli_rollback($connection);
+        $response['success'] = false;
         $response['message'] = $e->getMessage();
     }
 

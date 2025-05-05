@@ -1,3 +1,246 @@
+<?php
+include('../SchedureEvent/connect.php');
+
+// Initialize variables
+$projects = [];
+$all_members = [];
+$all_activities = [];
+
+// Function to get all projects
+function getAllProjects($connection) {
+    $projects = [];
+    $query = "SELECT project_id, project_name FROM projects ORDER BY project_name";
+    $result = mysqli_query($connection, $query);
+    while ($row = mysqli_fetch_assoc($result)) {
+        $projects[] = $row;
+    }
+    return $projects;
+}
+
+// Function to get project members (modified to return all members)
+function getProjectMembers($connection, $project_id = null) {
+    $members = [];
+    $query = "SELECT 
+                pm.project_id,
+                u.user_id, 
+                u.full_name, 
+                u.email, 
+                u.last_login,
+                pm.role, 
+                pm.joined_at
+              FROM project_members pm
+              JOIN users u ON pm.user_id = u.user_id";
+    
+    if ($project_id !== null) {
+        $query .= " WHERE pm.project_id = ?";
+        $stmt = $connection->prepare($query);
+        $stmt->bind_param("i", $project_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = mysqli_query($connection, $query);
+    }
+    
+    while ($row = ($project_id !== null ? $result->fetch_assoc() : mysqli_fetch_assoc($result))) {
+        $members[] = $row;
+    }
+    
+    if ($project_id !== null) {
+        $stmt->close();
+    }
+    
+    return $members;
+}
+
+// Function to get recent tasks assigned to a user
+function getRecentActivities($connection, $assignee_id = null, $limit = 10) {
+    $activities = [];
+    
+    $query = "SELECT 
+                u.user_id,
+                u.full_name,
+                t.id AS task_id,
+                t.title,
+                t.description,
+                t.deadline,
+                t.created_at AS timestamp,
+                t.status
+              FROM tasks t
+              JOIN users u ON t.assignee_id = u.user_id";
+    
+    if ($assignee_id !== null) {
+        $query .= " WHERE t.assignee_id = ?";
+    }
+    
+    $query .= " ORDER BY t.created_at DESC LIMIT ?";
+    
+    $stmt = $connection->prepare($query);
+    
+    if ($assignee_id !== null) {
+        $stmt->bind_param("ii", $assignee_id, $limit);
+    } else {
+        $stmt->bind_param("i", $limit);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    while ($row = $result->fetch_assoc()) {
+        $activities[] = $row;
+    }
+    
+    $stmt->close();
+    return $activities;
+}
+
+
+
+
+// Helper function to generate activity description
+function generateTaskDescription($task) {
+    $description = "Task '{$task['title']}' was ";
+    
+    if ($task['completed']) {
+        $description .= "completed";
+    } elseif ($task['status'] === 'in_progress') {
+        $description .= "started working on";
+    } else {
+        $description .= "created";
+    }
+    
+    return $description;
+}
+
+// Get all data from database
+$projects = getAllProjects($connection);
+$all_members = getProjectMembers($connection); // Get all members for all projects
+$recent_activities = getRecentActivities($connection, $_SESSION['user_id'] ?? null, 10);
+
+// Helper functions (unchanged)
+function getInitials($full_name) {
+    $initials = '';
+    $parts = explode(' ', $full_name);
+    foreach ($parts as $part) {
+        $initials .= strtoupper(substr($part, 0, 1));
+    }
+    return substr($initials, 0, 2);
+}
+
+function formatDate($dateString) {
+    return date('M j, Y', strtotime($dateString));
+}
+
+function formatDateTime($dateTimeString) {
+    return date('M j, Y g:i a', strtotime($dateTimeString));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Handle Role Update
+if (isset($_POST['update_role'])) {
+    $member_id = $_POST['member_id'];
+    $new_role = $_POST['new_role'];
+    
+    // List of all valid roles from your dropdown
+    $valid_roles = [
+        // Leadership & Management
+        'executive_director', 'deputy_director', 'department_head', 'division_chief',
+        'program_manager', 'project_manager', 'team_lead', 'unit_supervisor',
+        'regional_coordinator', 'strategic_advisor', 'governance_officer', 'operations_manager',
+        
+        // Technical & Research
+        'chief_scientist', 'senior_researcher', 'research_fellow', 'data_scientist',
+        'statistician', 'technical_advisor', 'innovation_specialist', 'lab_manager',
+        'field_researcher', 'evaluation_specialist', 'technology_architect', 'systems_analyst',
+        'ai_specialist', 'gis_specialist', 'technical_writer',
+        
+        // Administration & Support
+        'admin_officer', 'hr_manager', 'finance_officer', 'procurement_specialist',
+        'logistics_coordinator', 'facilities_manager', 'executive_assistant', 'records_manager',
+        'legal_advisor', 'compliance_officer', 'internal_auditor', 'security_officer',
+        
+        // Knowledge Management
+        'km_strategist', 'knowledge_curator', 'information_specialist', 'content_manager',
+        'documentation_specialist', 'taxonomy_expert', 'metadata_specialist', 'community_manager',
+        'learning_developer', 'knowledge_analyst',
+        
+        // ICT & Digital
+        'cio', 'systems_admin', 'database_admin', 'network_engineer',
+        'software_developer', 'webmaster', 'cybersecurity_specialist', 'digital_transformation_lead',
+        
+        // Communication & Outreach
+        'communications_director', 'public_relations_officer', 'media_specialist',
+        'graphic_designer', 'multimedia_producer'
+    ];
+    
+    // Validate inputs
+    if (!empty($member_id) && in_array($new_role, $valid_roles)) {
+        $stmt = $connection->prepare("UPDATE project_members SET role = ? WHERE user_id = ?");
+        $stmt->bind_param("si", $new_role, $member_id);
+        
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "Role updated successfully to " . ucwords(str_replace('_', ' ', $new_role));
+        } else {
+            $_SESSION['error'] = "Error updating role: " . $connection->error;
+        }
+        $stmt->close();
+    } else {
+        $_SESSION['error'] = "Invalid role or member ID";
+    }
+    
+    // Redirect back with project_id if it exists in URL
+    $redirect_url = $_SERVER['PHP_SELF'];
+    if (isset($_GET['project_id'])) {
+        $redirect_url .= "?project_id=" . $_GET['project_id'];
+    }
+    header("Location: " . $redirect_url);
+    exit();
+}
+// Handle Member Removal
+if (isset($_POST['remove_member'])) {
+    $member_id = $_POST['member_id'];
+    
+    if (!empty($member_id)) {
+        $stmt = $connection->prepare("DELETE FROM project_members WHERE user_id = ?");
+        $stmt->bind_param("i", $member_id);
+        
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "Member removed successfully!";
+        } else {
+            $_SESSION['error'] = "Error removing member: " . $connection->error;
+        }
+        $stmt->close();
+    } else {
+        $_SESSION['error'] = "Invalid member ID";
+    }
+    header("Location: ".$_SERVER['PHP_SELF']);
+    exit();
+}
+
+// Display messages if any
+if (isset($_SESSION['message'])) {
+    echo '<div class="alert success">'.htmlspecialchars($_SESSION['message']).'</div>';
+    unset($_SESSION['message']);
+}
+if (isset($_SESSION['error'])) {
+    echo '<div class="alert error">'.htmlspecialchars($_SESSION['error']).'</div>';
+    unset($_SESSION['error']);
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,386 +248,186 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Members Management</title>
     <style>
-    /* Updated to match header.css variables */
-    :root {
-        --primary-color: #1a237e;
-        --secondary-color: #2c3e50;
-        --accent-color: #00A0DF;
-        --background-color: #ecf0f1;
-        --text-color: #34495e;
-        --success-color: #2ecc71;
-        --warning-color: #f39c12;
-        --light-gray: #f5f7fa;
-        --dark-gray: #7f8c8d;
-    }
-
-    body {
-        font-family: 'Roboto', sans-serif;
-        line-height: 1.6;
-        background-color: var(--light-gray);
-        color: var(--text-color);
-        padding-top: 100px; /* Adjusted for fixed header (50px) + nav (60px) + spacing */
-        margin: 0;
-    }
-
-    .container {
-        max-width: 1200px;
-        padding-top: 100px;
-        margin-top: 100px;
-        background: white;
-        border-radius: 8px;
-        padding-left: 25px;
-        margin-left: 255px;
-        margin-right: 100px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 25px;
-        margin-bottom: 100px; /* Space for footer */
-    }
-
-    /* Header - Matched to your header styling */
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 25px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .project-title {
-        font-size: 24px;
-        color: var(--primary-color);
-        font-weight: 500;
-    }
-
-    /* Buttons - Matched to your header button styles */
-    .btn {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.3s;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .btn-primary {
-        background: var(--accent-color);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #0088cc;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-danger {
-        background: #e74c3c;
-        color: white;
-    }
-
-    .btn-danger:hover {
-        background: #c0392b;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .btn-secondary {
-        background: var(--background-color);
-        color: var(--secondary-color);
-    }
-
-    .btn-secondary:hover {
-        background: #d5dbdb;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    /* Members Table */
-    .members-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 25px;
-    }
-
-    .members-table th {
-        text-align: left;
-        padding: 12px 15px;
-        background: var(--background-color);
-        color: var(--secondary-color);
-        font-weight: 600;
-    }
-
-    .members-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #eee;
-        vertical-align: middle;
-    }
-
-    .members-table tr:hover {
-        background-color: rgba(0, 160, 223, 0.05);
-    }
-
-    .member-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: #ddd;
-        margin-right: 10px;
-        display: inline-block;
-        vertical-align: middle;
-        text-align: center;
-        line-height: 36px;
-        color: white;
-        background-color: var(--primary-color);
-        font-weight: 500;
-    }
-
-    .member-name {
-        display: inline-block;
-        vertical-align: middle;
-    }
-
-    .role-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-
-    .role-manager {
-        background: rgba(0, 160, 223, 0.1);
-        color: var(--accent-color);
-        border: 1px solid rgba(0, 160, 223, 0.3);
-    }
-
-    .role-contributor {
-        background: rgba(46, 204, 113, 0.1);
-        color: var(--success-color);
-        border: 1px solid rgba(46, 204, 113, 0.3);
-    }
-
-    .role-viewer {
-        background: rgba(155, 155, 155, 0.1);
-        color: var(--dark-gray);
-        border: 1px solid rgba(155, 155, 155, 0.3);
-    }
-
-    .action-btn {
-        background: none;
-        border: none;
-        color: var(--accent-color);
-        cursor: pointer;
-        margin-right: 10px;
-        font-size: 14px;
-        padding: 2px 0;
-    }
-
-    .action-btn:hover {
-        text-decoration: underline;
-    }
-
-    .action-btn.delete {
-        color: #e74c3c;
-    }
-
-    /* Activity Log */
-    .activity-log {
-        margin-top: 30px;
-    }
-
-    .activity-log h3 {
-        margin-bottom: 15px;
-        color: var(--primary-color);
-        padding-bottom: 5px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .activity-item {
-        display: flex;
-        margin-bottom: 15px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    .activity-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: var(--primary-color);
-        margin-right: 15px;
-        flex-shrink: 0;
-        text-align: center;
-        line-height: 32px;
-        color: white;
-        font-weight: 500;
-    }
-
-    .activity-content {
-        flex-grow: 1;
-    }
-
-    .activity-meta {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 5px;
-        font-size: 13px;
-        color: var(--dark-gray);
-    }
-
-    /* Modals - Adjusted to match your theme */
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 1100; /* Higher than header z-index (1000) */
-        justify-content: center;
-        align-items: center;
-    }
-
-    .modal-content {
-        background: white;
-        border-radius: 8px;
-        width: 90%;
-        max-width: 500px;
-        max-height: 90vh;
-        overflow-y: auto;
-        padding: 25px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    }
-
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .close-modal {
-        background: none;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        color: var(--dark-gray);
-    }
-
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: var(--secondary-color);
-    }
-
-    .form-control {
-        width: 100%;
-        padding: 10px 15px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 16px;
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .form-control:focus {
-        border-color: var(--accent-color);
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(0, 160, 223, 0.2);
-    }
-
-    .form-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 20px;
-    }
-
-    /* Bulk Actions */
-    .bulk-actions {
-        display: none;
-        margin-bottom: 15px;
-        padding: 10px;
-        background: var(--background-color);
-        border-radius: 4px;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .bulk-actions.active {
-        display: flex;
-    }
-
-    .select-all {
-        margin-right: 15px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
         body {
-            padding-top: 150px; /* Extra space for mobile header */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            color: #333;
         }
-        
         .container {
-            margin: 10px;
+            max-width: 1200px;
+            margin-left: 255px;
+            margin-right: 30px;
             
-            border-radius: 0;
+            padding: 30px;
+            padding-top: 100px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
         .header {
-            flex-direction: column;
-            align-items: flex-start;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .project-title {
+            margin: 0;
+            color: #2c3e50;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+        .members-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .members-table th, .members-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .members-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .member-avatar {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #3498db;
+            color: white;
+            text-align: center;
+            line-height: 36px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .member-name {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .role-manager {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .role-contributor {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+        .role-viewer {
+            background-color: #f3e5f5;
+            color: #8e24aa;
+        }
+        .activity-log {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .activity-item {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .activity-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #7f8c8d;
+            color: white;
+            text-align: center;
+            line-height: 32px;
+            margin-right: 15px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .activity-content {
+            flex: 1;
+        }
+        .activity-meta {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+        .bulk-actions {
+            display: none;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        .bulk-actions.show {
+            display: flex;
             gap: 10px;
         }
-        
-        .members-table {
-            display: block;
-            overflow-x: auto;
+        .action-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: transparent;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            margin-right: 5px;
         }
-        
-        .bulk-actions {
-            flex-wrap: wrap;
+        .action-btn.delete {
+            color: #e74c3c;
+            border-color: #e74c3c;
         }
-    }
-
-    @media (max-width: 480px) {
-        body {
-            padding-top: 180px; /* Extra space for mobile navigation */
+        .action-btn.delete:hover {
+            background-color: #fdecea;
         }
-        
-        .modal-content {
-            padding: 15px;
-        }
-        
-        .form-actions {
-            flex-direction: column;
-        }
-        
-        .btn {
-            width: 100%;
-        }
-    }
-</style>
+    </style>
 </head>
 <body>
 <?php include("../Internees_task/header.php"); ?>
     <div class="container">
+    <?php foreach ($projects as $project): ?>
+        <?php 
+        // Filter members for this project
+        $project_members = array_filter($all_members, function($m) use ($project) {
+            return $m['project_id'] == $project['project_id'];
+        });
+        
+        // Filter activities for this project
+        $project_activities = array_filter($all_activities, function($a) use ($project) {
+            return $a['project_id'] == $project['project_id'];
+        });
+        ?>
+        
         <div class="header">
-            <h1 class="project-title">Website Redesign Project - Team Management</h1>
-            <button class="btn btn-primary" onclick="openInviteModal()">Invite Members</button>
+            <h1 class="project-title"><?= htmlspecialchars($project['project_name']) ?> - Team Management</h1>
+            <p>Project ID: <?= $project['project_id'] ?></p>
+            <button class="btn btn-primary"><a href="../CollaborativeProjects/invitemember.php" style="text-decoration: none; color: white;">Invite Members</a></button>
         </div>
         
         <!-- Bulk Actions (hidden by default) -->
@@ -417,373 +460,172 @@
                 </tr>
             </thead>
             <tbody id="membersList">
-                <!-- Members will be loaded here -->
+                <?php foreach ($project_members as $member): ?>
+                <tr data-id="<?= $member['user_id'] ?>">
+                    <td><input type="checkbox" class="member-checkbox" onchange="updateSelectedCount()"></td>
+                    <td>
+                        <div class="member-avatar"><?= getInitials($member['full_name']) ?></div>
+                        <div class="member-name">
+                            <div><?= htmlspecialchars($member['full_name']) ?></div>
+                            <small style="color: #7f8c8d;"><?= htmlspecialchars($member['email']) ?></small>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="role-badge role-<?= $member['role'] ?>">
+                            <?= ucfirst($member['role']) ?>
+                        </span>
+                    </td>
+                    <td><?= formatDate($member['joined_at']) ?></td>
+                    <td><?= $member['last_login'] ? formatDateTime($member['last_login']) : 'Never' ?></td>
+                    <td>
+    <?php if (isset($_GET['edit_role']) && $_GET['edit_role'] == $member['user_id']): ?>
+        <!-- Role Edit Form -->
+        <form method="post" style="display: inline;">
+            <input type="hidden" name="member_id" value="<?= $member['user_id'] ?>">
+            <select name="new_role" class="role-dropdown">
+                <!-- Leadership & Management -->
+                <option value="executive_director" <?= $member['role'] == 'executive_director' ? 'selected' : '' ?>>Executive Director</option>
+                <option value="deputy_director" <?= $member['role'] == 'deputy_director' ? 'selected' : '' ?>>Deputy Director</option>
+                <option value="department_head" <?= $member['role'] == 'department_head' ? 'selected' : '' ?>>Department Head</option>
+                <option value="division_chief" <?= $member['role'] == 'division_chief' ? 'selected' : '' ?>>Division Chief</option>
+                <option value="program_manager" <?= $member['role'] == 'program_manager' ? 'selected' : '' ?>>Program Manager</option>
+                <option value="project_manager" <?= $member['role'] == 'project_manager' ? 'selected' : '' ?>>Project Manager</option>
+                <option value="team_lead" <?= $member['role'] == 'team_lead' ? 'selected' : '' ?>>Team Lead</option>
+                <option value="unit_supervisor" <?= $member['role'] == 'unit_supervisor' ? 'selected' : '' ?>>Unit Supervisor</option>
+                <option value="regional_coordinator" <?= $member['role'] == 'regional_coordinator' ? 'selected' : '' ?>>Regional Coordinator</option>
+                <option value="strategic_advisor" <?= $member['role'] == 'strategic_advisor' ? 'selected' : '' ?>>Strategic Advisor</option>
+                <option value="governance_officer" <?= $member['role'] == 'governance_officer' ? 'selected' : '' ?>>Governance Officer</option>
+                <option value="operations_manager" <?= $member['role'] == 'operations_manager' ? 'selected' : '' ?>>Operations Manager</option>
+                
+                <!-- Technical & Research -->
+                <option value="chief_scientist" <?= $member['role'] == 'chief_scientist' ? 'selected' : '' ?>>Chief Scientist</option>
+                <option value="senior_researcher" <?= $member['role'] == 'senior_researcher' ? 'selected' : '' ?>>Senior Researcher</option>
+                <option value="research_fellow" <?= $member['role'] == 'research_fellow' ? 'selected' : '' ?>>Research Fellow</option>
+                <option value="data_scientist" <?= $member['role'] == 'data_scientist' ? 'selected' : '' ?>>Data Scientist</option>
+                <option value="statistician" <?= $member['role'] == 'statistician' ? 'selected' : '' ?>>Statistician</option>
+                <option value="technical_advisor" <?= $member['role'] == 'technical_advisor' ? 'selected' : '' ?>>Technical Advisor</option>
+                <option value="innovation_specialist" <?= $member['role'] == 'innovation_specialist' ? 'selected' : '' ?>>Innovation Specialist</option>
+                <option value="lab_manager" <?= $member['role'] == 'lab_manager' ? 'selected' : '' ?>>Lab Manager</option>
+                <option value="field_researcher" <?= $member['role'] == 'field_researcher' ? 'selected' : '' ?>>Field Researcher</option>
+                <option value="evaluation_specialist" <?= $member['role'] == 'evaluation_specialist' ? 'selected' : '' ?>>Evaluation Specialist</option>
+                <option value="technology_architect" <?= $member['role'] == 'technology_architect' ? 'selected' : '' ?>>Technology Architect</option>
+                <option value="systems_analyst" <?= $member['role'] == 'systems_analyst' ? 'selected' : '' ?>>Systems Analyst</option>
+                <option value="ai_specialist" <?= $member['role'] == 'ai_specialist' ? 'selected' : '' ?>>AI Specialist</option>
+                <option value="gis_specialist" <?= $member['role'] == 'gis_specialist' ? 'selected' : '' ?>>GIS Specialist</option>
+                <option value="technical_writer" <?= $member['role'] == 'technical_writer' ? 'selected' : '' ?>>Technical Writer</option>
+                
+                <!-- Administration & Support -->
+                <option value="admin_officer" <?= $member['role'] == 'admin_officer' ? 'selected' : '' ?>>Admin Officer</option>
+                <option value="hr_manager" <?= $member['role'] == 'hr_manager' ? 'selected' : '' ?>>HR Manager</option>
+                <option value="finance_officer" <?= $member['role'] == 'finance_officer' ? 'selected' : '' ?>>Finance Officer</option>
+                <option value="procurement_specialist" <?= $member['role'] == 'procurement_specialist' ? 'selected' : '' ?>>Procurement Specialist</option>
+                <option value="logistics_coordinator" <?= $member['role'] == 'logistics_coordinator' ? 'selected' : '' ?>>Logistics Coordinator</option>
+                <option value="facilities_manager" <?= $member['role'] == 'facilities_manager' ? 'selected' : '' ?>>Facilities Manager</option>
+                <option value="executive_assistant" <?= $member['role'] == 'executive_assistant' ? 'selected' : '' ?>>Executive Assistant</option>
+                <option value="records_manager" <?= $member['role'] == 'records_manager' ? 'selected' : '' ?>>Records Manager</option>
+                <option value="legal_advisor" <?= $member['role'] == 'legal_advisor' ? 'selected' : '' ?>>Legal Advisor</option>
+                <option value="compliance_officer" <?= $member['role'] == 'compliance_officer' ? 'selected' : '' ?>>Compliance Officer</option>
+                <option value="internal_auditor" <?= $member['role'] == 'internal_auditor' ? 'selected' : '' ?>>Internal Auditor</option>
+                <option value="security_officer" <?= $member['role'] == 'security_officer' ? 'selected' : '' ?>>Security Officer</option>
+                
+                <!-- Knowledge Management -->
+                <option value="km_strategist" <?= $member['role'] == 'km_strategist' ? 'selected' : '' ?>>KM Strategist</option>
+                <option value="knowledge_curator" <?= $member['role'] == 'knowledge_curator' ? 'selected' : '' ?>>Knowledge Curator</option>
+                <option value="information_specialist" <?= $member['role'] == 'information_specialist' ? 'selected' : '' ?>>Information Specialist</option>
+                <option value="content_manager" <?= $member['role'] == 'content_manager' ? 'selected' : '' ?>>Content Manager</option>
+                <option value="documentation_specialist" <?= $member['role'] == 'documentation_specialist' ? 'selected' : '' ?>>Documentation Specialist</option>
+                <option value="taxonomy_expert" <?= $member['role'] == 'taxonomy_expert' ? 'selected' : '' ?>>Taxonomy Expert</option>
+                <option value="metadata_specialist" <?= $member['role'] == 'metadata_specialist' ? 'selected' : '' ?>>Metadata Specialist</option>
+                <option value="community_manager" <?= $member['role'] == 'community_manager' ? 'selected' : '' ?>>Community Manager</option>
+                <option value="learning_developer" <?= $member['role'] == 'learning_developer' ? 'selected' : '' ?>>Learning Developer</option>
+                <option value="knowledge_analyst" <?= $member['role'] == 'knowledge_analyst' ? 'selected' : '' ?>>Knowledge Analyst</option>
+                
+                <!-- ICT & Digital -->
+                <option value="cio" <?= $member['role'] == 'cio' ? 'selected' : '' ?>>Chief Information Officer</option>
+                <option value="systems_admin" <?= $member['role'] == 'systems_admin' ? 'selected' : '' ?>>Systems Administrator</option>
+                <option value="database_admin" <?= $member['role'] == 'database_admin' ? 'selected' : '' ?>>Database Administrator</option>
+                <option value="network_engineer" <?= $member['role'] == 'network_engineer' ? 'selected' : '' ?>>Network Engineer</option>
+                <option value="software_developer" <?= $member['role'] == 'software_developer' ? 'selected' : '' ?>>Software Developer</option>
+                <option value="webmaster" <?= $member['role'] == 'webmaster' ? 'selected' : '' ?>>Webmaster</option>
+                <option value="cybersecurity_specialist" <?= $member['role'] == 'cybersecurity_specialist' ? 'selected' : '' ?>>Cybersecurity Specialist</option>
+                <option value="digital_transformation_lead" <?= $member['role'] == 'digital_transformation_lead' ? 'selected' : '' ?>>Digital Transformation Lead</option>
+                
+                <!-- Communication & Outreach -->
+                <option value="communications_director" <?= $member['role'] == 'communications_director' ? 'selected' : '' ?>>Communications Director</option>
+                <option value="public_relations_officer" <?= $member['role'] == 'public_relations_officer' ? 'selected' : '' ?>>Public Relations Officer</option>
+                <option value="media_specialist" <?= $member['role'] == 'media_specialist' ? 'selected' : '' ?>>Media Specialist</option>
+                <option value="graphic_designer" <?= $member['role'] == 'graphic_designer' ? 'selected' : '' ?>>Graphic Designer</option>
+                <option value="multimedia_producer" <?= $member['role'] == 'multimedia_producer' ? 'selected' : '' ?>>Multimedia Producer</option>
+            </select>
+            <button type="submit" name="update_role" class="action-btn">Save</button>
+            <a href="?cancel=1" class="action-btn">Cancel</a>
+        </form>
+    <?php else: ?>
+        <!-- Normal View -->
+        <a href="?edit_role=<?= $member['user_id'] ?>" class="action-btn">Edit Role</a>
+        
+        <?php if ($member['role'] !== 'manager'): ?>
+            <?php if (isset($_GET['confirm_remove']) && $_GET['confirm_remove'] == $member['user_id']): ?>
+                <!-- Remove Confirmation -->
+                <form method="post" style="display: inline;">
+                    <input type="hidden" name="member_id" value="<?= $member['user_id'] ?>">
+                    <span>Confirm?</span>
+                    <button type="submit" name="remove_member" class="action-btn delete">Yes</button>
+                    <a href="?cancel=1" class="action-btn">No</a>
+                </form>
+            <?php else: ?>
+                <a href="?confirm_remove=<?= $member['user_id'] ?>" class="action-btn delete">Remove</a>
+            <?php endif; ?>
+        <?php endif; ?>
+    <?php endif; ?>
+</td>
+
+<?php
+// Handle cancel action
+if (isset($_GET['cancel'])) {
+    header("Location: ".str_replace(['&edit_role='.$_GET['edit_role'], '&confirm_remove='.$_GET['confirm_remove']], '', $_SERVER['REQUEST_URI']));
+    exit();
+}
+?>
+                </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
         
-        <!-- Activity Log -->
-        <div class="activity-log">
-            <h3>Recent Activity</h3>
-            <div id="activityFeed">
-                <!-- Activity items will be loaded here -->
+       <!-- Activity Log -->
+<div class="activity-log">
+    <h3>Recent Activity</h3>
+    <div id="activityFeed">
+        <?php foreach ($project_activities as $activity): ?>
+        <div class="activity-item">
+            <div class="activity-avatar"><?= getInitials($activity['full_name']) ?></div>
+            <div class="activity-content">
+                <div>
+                    <strong><?= htmlspecialchars($activity['full_name']) ?></strong> 
+                    worked on <strong><?= htmlspecialchars($activity['title']) ?></strong>:
+                    <?= htmlspecialchars($activity['description']) ?>
+                    <?php if (!empty($activity['project_name'])): ?>
+                    in <strong><?= htmlspecialchars($activity['project_name']) ?></strong>
+                    <?php endif; ?>
+                </div>
+                <div class="activity-meta">
+                    <span>Deadline: <?= formatDateTime($activity['deadline']) ?></span>
+                    <span>•</span>
+                    <span><?= formatDateTime($activity['timestamp']) ?></span>
+                </div>
             </div>
         </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+        
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+        
+    <?php endforeach; ?>
     </div>
     
-    <!-- Invite Member Modal -->
-    <div class="modal" id="inviteModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Invite New Members</h3>
-                <button class="close-modal" onclick="closeModal()">×</button>
-            </div>
-            
-            <form id="inviteForm">
-                <div class="form-group">
-                    <label for="inviteEmails">Email Addresses</label>
-                    <textarea id="inviteEmails" class="form-control" rows="3" 
-                              placeholder="Enter email addresses, separated by commas"></textarea>
-                    <small>You can enter multiple email addresses separated by commas</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="inviteRole">Assign Role</label>
-                    <select id="inviteRole" class="form-control">
-                        <option value="contributor">Contributor</option>
-                        <option value="manager">Project Manager</option>
-                        <option value="viewer">Viewer</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="inviteMessage">Personal Message (Optional)</label>
-                    <textarea id="inviteMessage" class="form-control" rows="3" 
-                              placeholder="Add a personal message to the invitation"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Send Invitations</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Edit Role Modal -->
-    <div class="modal" id="roleModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Change Member Role</h3>
-                <button class="close-modal" onclick="closeModal()">×</button>
-            </div>
-            
-            <form id="roleForm">
-                <input type="hidden" id="editMemberId">
-                <div class="form-group">
-                    <label>Member</label>
-                    <p id="editMemberName" style="padding: 8px 0; font-weight: 500;"></p>
-                </div>
-                
-                <div class="form-group">
-                    <label for="newRole">New Role</label>
-                    <select id="newRole" class="form-control">
-                        <option value="manager">Project Manager</option>
-                        <option value="contributor">Contributor</option>
-                        <option value="viewer">Viewer</option>
-                    </select>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update Role</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Confirmation Modal -->
-    <div class="modal" id="confirmModal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>Confirm Action</h3>
-                <button class="close-modal" onclick="closeModal()">×</button>
-            </div>
-            
-            <div class="modal-body">
-                <p id="confirmMessage">Are you sure you want to remove this member?</p>
-            </div>
-            
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmActionBtn">Confirm</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Sample data - in a real app, this would come from an API
-        const members = [
-            { id: 1, name: "Sarah Johnson", email: "sarah@example.com", role: "manager", 
-              joined: "2023-06-15", lastActive: "2023-07-20", avatar: "SJ" },
-            { id: 2, name: "John Smith", email: "john@example.com", role: "contributor", 
-              joined: "2023-06-18", lastActive: "2023-07-19", avatar: "JS" },
-            { id: 3, name: "Emily Davis", email: "emily@example.com", role: "contributor", 
-              joined: "2023-06-20", lastActive: "2023-07-18", avatar: "ED" },
-            { id: 4, name: "Michael Brown", email: "michael@example.com", role: "viewer", 
-              joined: "2023-06-22", lastActive: "2023-07-15", avatar: "MB" }
-        ];
-        
-        const activityLog = [
-            { id: 1, memberId: 2, action: "completed task 'Homepage layout'", timestamp: "2023-07-20T14:30:00" },
-            { id: 2, memberId: 3, action: "uploaded file 'design-specs.pdf'", timestamp: "2023-07-20T11:15:00" },
-            { id: 3, memberId: 1, action: "updated project timeline", timestamp: "2023-07-19T16:45:00" },
-            { id: 4, memberId: 2, action: "commented on task 'User authentication'", timestamp: "2023-07-19T10:20:00" },
-            { id: 5, memberId: 4, action: "viewed project dashboard", timestamp: "2023-07-18T09:10:00" }
-        ];
-        
-        // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
-            loadMembers();
-            loadActivityLog();
-            
-            // Form submissions
-            document.getElementById('inviteForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                inviteMembers();
-            });
-            
-            document.getElementById('roleForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                updateMemberRole();
-            });
-        });
-        
-        // Load members into the table
-        function loadMembers() {
-            const membersList = document.getElementById('membersList');
-            membersList.innerHTML = '';
-            
-            members.forEach(member => {
-                const roleClass = `role-${member.role}`;
-                const roleName = member.role === 'manager' ? 'Project Manager' : 
-                                member.role === 'contributor' ? 'Contributor' : 'Viewer';
-                
-                const row = document.createElement('tr');
-                row.dataset.id = member.id;
-                row.innerHTML = `
-                    <td><input type="checkbox" class="member-checkbox" onchange="updateSelectedCount()"></td>
-                    <td>
-                        <div class="member-avatar">${member.avatar}</div>
-                        <div class="member-name">
-                            <div>${member.name}</div>
-                            <small style="color: var(--dark-gray);">${member.email}</small>
-                        </div>
-                    </td>
-                    <td><span class="role-badge ${roleClass}">${roleName}</span></td>
-                    <td>${formatDate(member.joined)}</td>
-                    <td>${formatDate(member.lastActive)}</td>
-                    <td>
-                        <button class="action-btn" onclick="openRoleModal(${member.id}, '${member.name}', '${member.role}')">
-                            Edit Role
-                        </button>
-                        ${member.role !== 'manager' ? 
-                          `<button class="action-btn delete" onclick="confirmRemoveMember(${member.id}, '${member.name}')">
-                            Remove
-                          </button>` : ''
-                        }
-                    </td>
-                `;
-                
-                membersList.appendChild(row);
-            });
-        }
-        
-        // Load activity log
-        function loadActivityLog() {
-            const activityFeed = document.getElementById('activityFeed');
-            activityFeed.innerHTML = '';
-            
-            activityLog.forEach(activity => {
-                const member = members.find(m => m.id === activity.memberId);
-                if (!member) return;
-                
-                const activityItem = document.createElement('div');
-                activityItem.className = 'activity-item';
-                activityItem.innerHTML = `
-                    <div class="activity-avatar">${member.avatar}</div>
-                    <div class="activity-content">
-                        <div><strong>${member.name}</strong> ${activity.action}</div>
-                        <div class="activity-meta">
-                            <span>${formatDateTime(activity.timestamp)}</span>
-                        </div>
-                    </div>
-                `;
-                
-                activityFeed.appendChild(activityItem);
-            });
-        }
-        
-        // Modal functions
-        function openInviteModal() {
-            document.getElementById('inviteModal').style.display = 'flex';
-        }
-        
-        function openRoleModal(memberId, memberName, currentRole) {
-            document.getElementById('editMemberId').value = memberId;
-            document.getElementById('editMemberName').textContent = memberName;
-            document.getElementById('newRole').value = currentRole;
-            document.getElementById('roleModal').style.display = 'flex';
-        }
-        
-        function closeModal() {
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.style.display = 'none';
-            });
-        }
-        
-        // Invite members function
-        function inviteMembers() {
-            const emails = document.getElementById('inviteEmails').value;
-            const role = document.getElementById('inviteRole').value;
-            const message = document.getElementById('inviteMessage').value;
-            
-            // Validate emails
-            const emailList = emails.split(',').map(email => email.trim()).filter(email => email);
-            if (emailList.length === 0) {
-                alert('Please enter at least one email address');
-                return;
-            }
-            
-            // In a real app, this would be an AJAX call to your backend
-            console.log('Inviting:', emailList, 'with role:', role);
-            
-            // Simulate API call
-            setTimeout(() => {
-                alert(`Invitations sent to ${emailList.length} ${emailList.length === 1 ? 'person' : 'people'}`);
-                closeModal();
-                document.getElementById('inviteForm').reset();
-            }, 1000);
-        }
-        
-        // Update member role
-        function updateMemberRole() {
-            const memberId = parseInt(document.getElementById('editMemberId').value);
-            const newRole = document.getElementById('newRole').value;
-            
-            // In a real app, this would be an AJAX call
-            const memberIndex = members.findIndex(m => m.id === memberId);
-            if (memberIndex !== -1) {
-                members[memberIndex].role = newRole;
-                loadMembers();
-                closeModal();
-            }
-        }
-        
-        // Confirm member removal
-        function confirmRemoveMember(memberId, memberName) {
-            const confirmModal = document.getElementById('confirmModal');
-            document.getElementById('confirmMessage').textContent = 
-                `Are you sure you want to remove ${memberName} from the project?`;
-            
-            // Set up confirm button
-            const confirmBtn = document.getElementById('confirmActionBtn');
-            confirmBtn.onclick = function() {
-                removeMember(memberId);
-                closeModal();
-            };
-            
-            confirmModal.style.display = 'flex';
-        }
-        
-        // Remove member function
-        function removeMember(memberId) {
-            // In a real app, this would be an AJAX call
-            const memberIndex = members.findIndex(m => m.id === memberId);
-            if (memberIndex !== -1) {
-                members.splice(memberIndex, 1);
-                loadMembers();
-            }
-        }
-        
-        // Bulk actions
-        function toggleBulkActions() {
-            const bulkToggle = document.getElementById('toggleBulk');
-            const bulkActions = document.getElementById('bulkActions');
-            
-            if (bulkToggle.checked) {
-                bulkActions.classList.add('active');
-                document.querySelectorAll('.member-checkbox').forEach(checkbox => {
-                    checkbox.checked = true;
-                });
-                updateSelectedCount();
-            } else {
-                bulkActions.classList.remove('active');
-                document.querySelectorAll('.member-checkbox').forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-            }
-        }
-        
-        function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAll');
-            document.querySelectorAll('.member-checkbox').forEach(checkbox => {
-                checkbox.checked = selectAll.checked;
-            });
-            updateSelectedCount();
-        }
-        
-        function updateSelectedCount() {
-            const selectedCount = document.querySelectorAll('.member-checkbox:checked').length;
-            document.getElementById('selectedCount').textContent = `${selectedCount} selected`;
-        }
-        
-        function removeSelectedMembers() {
-            const selectedCheckboxes = document.querySelectorAll('.member-checkbox:checked');
-            const selectedIds = Array.from(selectedCheckboxes).map(checkbox => 
-                parseInt(checkbox.closest('tr').dataset.id)
-            );
-            
-            if (selectedIds.length === 0) {
-                alert('Please select at least one member');
-                return;
-            }
-            
-            // In a real app, this would be an AJAX call
-            selectedIds.forEach(id => {
-                const memberIndex = members.findIndex(m => m.id === id);
-                if (memberIndex !== -1 && members[memberIndex].role !== 'manager') {
-                    members.splice(memberIndex, 1);
-                }
-            });
-            
-            loadMembers();
-            cancelBulkActions();
-        }
-        
-        function cancelBulkActions() {
-            document.getElementById('toggleBulk').checked = false;
-            document.getElementById('bulkActions').classList.remove('active');
-            document.querySelectorAll('.member-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-        
-        // Helper functions
-        function formatDate(dateString) {
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(dateString).toLocaleDateString('en-US', options);
-        }
-        
-        function formatDateTime(dateTimeString) {
-            const options = { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            };
-            return new Date(dateTimeString).toLocaleDateString('en-US', options);
-        }
+     
     </script>
 </body>
 </html>

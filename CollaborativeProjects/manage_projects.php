@@ -23,7 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param("ssssis", $title, $description, $status, $priority, $assignee_id, $deadline);
             
             if ($stmt->execute()) {
-                echo json_encode(['success' => true, 'message' => 'Task created successfully!']);
+                header("Location: ".$_SERVER['HTTP_REFERER']);
+                // echo json_encode(['success' => true, 'message' => 'Task created successfully!']);
             } else {
                 echo json_encode(['success' => false, 'message' => "Error creating task: " . $stmt->error]);
             }
@@ -33,6 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         exit();
     }
+
+
+
 
     // Handle file upload
     if (isset($_FILES['file'])) {
@@ -87,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $safeName = uniqid() . '.' . $extension;
             $destination = $uploadDir . $safeName;
             
-            // Move uploaded file to storage
+            // // Move uploaded file to storage
             if (!move_uploaded_file($file['tmp_name'], $destination)) {
                 throw new Exception("Failed to move uploaded file.");
             }
@@ -100,13 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fileId = $stmt->insert_id;
                 $stmt->close();
                 
-                // Get the newly uploaded file to return as JSON
-                $stmt = $connection->prepare("SELECT id, filename, filepath, size, type FROM files WHERE id = ?");
-                $stmt->bind_param("i", $fileId);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $newFile = $result->fetch_assoc();
-                $stmt->close();
+                // // Get the newly uploaded file to return as JSON
+                // $stmt = $connection->prepare("SELECT id, filename, filepath, size, type FROM files WHERE id = ?");
+                // $stmt->bind_param("i", $fileId);
+                // $stmt->execute();
+                // $result = $stmt->get_result();
+                // $newFile = $result->fetch_assoc();
+                // $stmt->close();
                 
                 // Format the file data
                 $formattedFile = [
@@ -124,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 //     'message' => 'File uploaded successfully!',
                 //     'file' => $formattedFile
                 // ]);
+                header("Location: ".$_SERVER['HTTP_REFERER']);
             } else {
                 throw new Exception("Failed to save file information to database.");
             }
@@ -187,7 +192,7 @@ try {
             'path' => $row['filepath'],
             'size' => formatSizeUnits($row['size']),
             'type' => $row['type'],
-            'uploaded' => date('M j, Y', strtotime($row['uploaded_at']))
+            'uploaded' => date('M j, Y', strtotime($row['uploaded_']))
         ];
     }
 } catch (Exception $e) {
@@ -208,6 +213,8 @@ function formatSizeUnits($bytes) {
     }
     return '0 bytes';
 }
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -462,7 +469,7 @@ function formatSizeUnits($bytes) {
             margin: 0 auto;
             padding: 20px;
             padding-top: 100px;
-            margin-right: 100px;
+            margin-right: 200px;
             margin-bottom: 50px;
         }
         
@@ -869,6 +876,125 @@ function formatSizeUnits($bytes) {
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        .file-table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.file-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.file-table th {
+    background-color: #f5f5f5;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #ddd;
+}
+
+.file-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.file-table tr:last-child td {
+    border-bottom: none;
+}
+
+.file-table tr:hover {
+    background-color: #f9f9f9;
+}
+
+.file-type {
+    width: 50px;
+    text-align: center;
+    color: #555;
+    font-size: 1.2em;
+}
+
+.file-name {
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.file-size, .file-date {
+    white-space: nowrap;
+    color: #666;
+}
+
+.file-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.btn-download, .btn-delete {
+    display: inline-block;
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: white;
+    text-decoration: none;
+    margin-left: 5px;
+    transition: all 0.2s;
+}
+
+.btn-download {
+    background: #4CAF50;
+}
+
+.btn-download:hover {
+    background: #3e8e41;
+}
+
+.btn-delete {
+    background: #f44336;
+}
+
+.btn-delete:hover {
+    background: #d32f2f;
+}
+
+.no-files {
+    text-align: center;
+    color: #777;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .file-table th, .file-table td {
+        padding: 8px 10px;
+    }
+    
+    .file-actions {
+        text-align: center;
+    }
+}
     </style>
 </head>
 <body>
@@ -886,10 +1012,10 @@ function formatSizeUnits($bytes) {
     <!-- Dashboard Header -->
     <div class="dashboard-header">
         <h1 class="project-title">Website Redesign Project</h1>
-        <div class="project-actions">
+        <!-- <div class="project-actions">
             <button class="btn btn-secondary">Export Report</button>
             <button class="btn btn-primary">Share Project</button>
-        </div>
+        </div> -->
     </div>
     
     <!-- Dashboard Grid -->
@@ -1074,82 +1200,104 @@ function formatSizeUnits($bytes) {
                 </div>
             </div>
 
-           
+
+ <!--file repository -->
+
+
             <div class="file-repository">
     <div class="file-actions">
         <h2>File Repository</h2>
         
-        <?php if (isset($_SESSION['message'])): ?>
-            <div class="upload-message success">
-                <?php echo htmlspecialchars($_SESSION['message']); unset($_SESSION['message']); ?>
-            </div>
-        <?php endif; ?>
+       
         
-        <?php if (isset($_SESSION['error'])): ?>
-            <div class="upload-message error">
-                <?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
-            </div>
-        <?php endif; ?>
-        
-        <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST" enctype="multipart/form-data" class="file-upload-form">
+        <!-- File Upload Form -->
+        <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="POST" enctype="multipart/form-data" class="file-upload-form">
             <div class="file-upload">
                 <input type="file" name="file" id="file-upload-input" required>
                 <label for="file-upload-input">Choose File</label>
                 <span id="file-name-display">No file chosen</span>
-                <button type="submit" class="btn-upload">Upload</button>
+                <button type="submit" name="upload" class="btn-upload">Upload</button>
+                <button type="button" id="view-files-btn" class="btn-upload">View Files</button>
             </div>
         </form>
     </div>
     
-    <?php if (!empty($files)): ?>
-        <div class="file-grid">
-            <?php foreach ($files as $file): 
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                $iconClass = 'other';
-                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'svg'])) $iconClass = 'image';
-                elseif (in_array($ext, ['pdf'])) $iconClass = 'pdf';
-                elseif (in_array($ext, ['doc', 'docx'])) $iconClass = 'doc';
-                elseif (in_array($ext, ['xls', 'xlsx', 'csv'])) $iconClass = 'xls';
-                elseif (in_array($ext, ['zip', 'rar', 'tar', 'gz'])) $iconClass = 'zip';
-            ?>
-                <div class="file-card">
-                    <div class="file-icon <?php echo $iconClass; ?>">
-                        <?php 
-                        if ($iconClass == 'image') echo '🖼️';
-                        elseif ($iconClass == 'pdf') echo '📕';
-                        elseif ($iconClass == 'doc') echo '📄';
-                        elseif ($iconClass == 'xls') echo '📊';
-                        elseif ($iconClass == 'zip') echo '🗄️';
-                        else echo '📁';
-                        ?>
-                    </div>
-                    <h4 class="file-name" title="<?php echo htmlspecialchars($file['name']); ?>">
-                        <?php echo htmlspecialchars($file['name']); ?>
-                    </h4>
-                    <div class="file-meta">
-                        <div><i>📅</i> <?php echo htmlspecialchars($file['uploaded']); ?></div>
-                        <div><i>📏</i> <?php echo htmlspecialchars($file['size']); ?></div>
-                        <div><i>🆔</i> <?php echo strtoupper($ext); ?> file</div>
-                    </div>
-                    <div class="file-actions-bottom">
-                        <a href="download.php?id=<?php echo $file['id']; ?>" class="file-download">
-                            <i>⬇️</i> Download
-                        </a>
-                        <a href="delete_file.php?id=<?php echo $file['id']; ?>" class="file-delete" onclick="return confirm('Are you sure you want to delete this file?')">
-                            <i>🗑️</i> Delete
-                        </a>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php else: ?>
-        <div class="empty-state">
-            <div class="empty-icon">📁</div>
-            <h3>No files uploaded yet</h3>
-            <p>Upload your first file using the form above</p>
-        </div>
-    <?php endif; ?>
+   <!-- File Display Section -->
+<div class="file-display" id="file-display-section" style="display: none;">
+    <h3>Uploaded Files</h3>
+    <div class="file-table-container">
+        <table class="file-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>File Name</th>
+                    <th>Size</th>
+                    <th>Uploaded</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                // Query all files from database
+                $query = "SELECT id, filename, filepath, size, type, uploaded FROM files ORDER BY uploaded DESC";
+                $result = $connection->query($query);
+                
+                if ($result && $result->num_rows > 0) {
+                    while ($row = $result->fetch_assoc()) {
+                        $fileExt = strtolower(pathinfo($row['filename'], PATHINFO_EXTENSION));
+                        echo '<tr class="file-row">';
+                        
+                        // File Type Icon
+                        echo '<td class="file-type">';
+                        switch($fileExt) {
+                            case 'pdf':
+                                echo '<i class="fas fa-file-pdf" title="PDF Document"></i>';
+                                break;
+                            case 'doc':
+                            case 'docx':
+                                echo '<i class="fas fa-file-word" title="Word Document"></i>';
+                                break;
+                            case 'jpg':
+                            case 'jpeg':
+                            case 'png':
+                                echo '<i class="fas fa-file-image" title="Image File"></i>';
+                                break;
+                            case 'txt':
+                                echo '<i class="fas fa-file-alt" title="Text File"></i>';
+                                break;
+                            default:
+                                echo '<i class="fas fa-file" title="File"></i>';
+                        }
+                        echo '</td>';
+                        
+                        // File Name
+                        echo '<td class="file-name">' . htmlspecialchars($row['filename']) . '</td>';
+                        
+                        // File Size
+                        echo '<td class="file-size">' . formatSizeUnits($row['size']) . '</td>';
+                        
+                        // Upload Date
+                        echo '<td class="file-date">' . date('M j, Y', strtotime($row['uploaded'])) . '</td>';
+                        
+                        // Actions
+                        echo '<td class="file-actions">';
+                        echo '<a href="download.php?id=' . $row['id'] . '" class="btn-download" title="Download"><i class="fas fa-download"></i></a>';
+                        echo '<a href="delete.php?id=' . $row['id'] . '" class="btn-delete" title="Delete" onclick="return confirm(\'Are you sure you want to delete this file?\')"><i class="fas fa-trash"></i></a>';
+                        echo '</td>';
+                        
+                        echo '</tr>';
+                    }
+                    $result->free();
+                } else {
+                    echo '<tr><td colspan="5" class="no-files">No files uploaded yet.</td></tr>';
+                }
+                ?>
+            </tbody>
+        </table>
+    </div>
 </div>
+</div>
+
     
 
             
@@ -1365,17 +1513,39 @@ function closeModal() {
     });
 }
 
-document.getElementById('file-upload-input').addEventListener('change', function(e) {
-    const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-    document.getElementById('file-name-display').textContent = fileName;
+
+
+
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Show selected filename
+    const fileInput = document.getElementById('file-upload-input');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            fileNameDisplay.textContent = this.files[0].name;
+        } else {
+            fileNameDisplay.textContent = 'No file chosen';
+        }
+    });
+
+    // Toggle file display section
+    const viewFilesBtn = document.getElementById('view-files-btn');
+    const fileDisplaySection = document.getElementById('file-display-section');
+    
+    viewFilesBtn.addEventListener('click', function() {
+        if (fileDisplaySection.style.display === 'none') {
+            fileDisplaySection.style.display = 'block';
+            this.textContent = 'Hide Files';
+        } else {
+            fileDisplaySection.style.display = 'none';
+            this.textContent = 'View Files';
+        }
+    });
 });
-
-
-
-
-
-
-
 
 
 

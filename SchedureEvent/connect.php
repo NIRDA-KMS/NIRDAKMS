@@ -1,6 +1,6 @@
 <?php
 // Database configuration
-$host = '127.0.0.1:3307';     // Database server
+$host = 'localhost';     // Database server
 $user = 'root';          // Database username
 $pass = '';              // Database password
 $dbname = 'NIRDAKMS';      // Database name
