@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                     // Send initial confirmation to attendees if email reminder is enabled
                     if ($emailReminder) {
                       require __DIR__ . '/../vendor/autoload.php';
-                        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                        $mail = new PHPMailer(true);
                         
                         try {
                             // SMTP configuration

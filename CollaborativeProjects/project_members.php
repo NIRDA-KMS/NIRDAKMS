@@ -52,14 +52,13 @@ function getProjectMembers($connection, $project_id = null) {
     return $members;
 }
 
-// Function to get recent tasks assigned to a user
 function getRecentActivities($connection, $assignee_id = null, $limit = 10) {
     $activities = [];
     
     $query = "SELECT 
                 u.user_id,
                 u.full_name,
-                t.id AS task_id,
+                t.id,
                 t.title,
                 t.description,
                 t.deadline,
@@ -98,9 +97,9 @@ function getRecentActivities($connection, $assignee_id = null, $limit = 10) {
 
 // Helper function to generate activity description
 function generateTaskDescription($task) {
-    $description = "Task '{$task['title']}' was ";
+    $description = "Task '".htmlspecialchars($task['title'])."' was ";
     
-    if ($task['completed']) {
+    if ($task['status'] === 'completed') {
         $description .= "completed";
     } elseif ($task['status'] === 'in_progress') {
         $description .= "started working on";
@@ -114,26 +113,49 @@ function generateTaskDescription($task) {
 // Get all data from database
 $projects = getAllProjects($connection);
 $all_members = getProjectMembers($connection); // Get all members for all projects
-$recent_activities = getRecentActivities($connection, $_SESSION['user_id'] ?? null, 10);
+$recent_activities = isset($connection) ? getRecentActivities($connection, $_SESSION['user_id'] ?? null, 10) : [];
 
-// Helper functions (unchanged)
+// Helper functions with improved error handling
 function getInitials($full_name) {
+    if (empty($full_name)) {
+        return '';
+    }
+    
     $initials = '';
-    $parts = explode(' ', $full_name);
+    $parts = explode(' ', trim($full_name));
     foreach ($parts as $part) {
-        $initials .= strtoupper(substr($part, 0, 1));
+        if (!empty($part)) {
+            $initials .= strtoupper(substr($part, 0, 1));
+        }
     }
     return substr($initials, 0, 2);
 }
 
 function formatDate($dateString) {
-    return date('M j, Y', strtotime($dateString));
+    if (empty($dateString) || $dateString === '0000-00-00') {
+        return 'No date';
+    }
+    
+    try {
+        $date = new DateTime($dateString);
+        return $date->format('M j, Y');
+    } catch (Exception $e) {
+        return 'Invalid date';
+    }
 }
 
 function formatDateTime($dateTimeString) {
-    return date('M j, Y g:i a', strtotime($dateTimeString));
+    if (empty($dateTimeString) || $dateTimeString === '0000-00-00 00:00:00') {
+        return 'No date/time';
+    }
+    
+    try {
+        $date = new DateTime($dateTimeString);
+        return $date->format('M j, Y g:i a');
+    } catch (Exception $e) {
+        return 'Invalid date/time';
+    }
 }
-
 
 
 
@@ -592,30 +614,46 @@ if (isset($_GET['cancel'])) {
             </tbody>
         </table>
         
-       <!-- Activity Log -->
+   <!-- Activity Log -->
 <div class="activity-log">
     <h3>Recent Activity</h3>
     <div id="activityFeed">
-        <?php foreach ($project_activities as $activity): ?>
-        <div class="activity-item">
-            <div class="activity-avatar"><?= getInitials($activity['full_name']) ?></div>
-            <div class="activity-content">
-                <div>
-                    <strong><?= htmlspecialchars($activity['full_name']) ?></strong> 
-                    worked on <strong><?= htmlspecialchars($activity['title']) ?></strong>:
-                    <?= htmlspecialchars($activity['description']) ?>
-                    <?php if (!empty($activity['project_name'])): ?>
-                    in <strong><?= htmlspecialchars($activity['project_name']) ?></strong>
-                    <?php endif; ?>
-                </div>
-                <div class="activity-meta">
-                    <span>Deadline: <?= formatDateTime($activity['deadline']) ?></span>
-                    <span>•</span>
-                    <span><?= formatDateTime($activity['timestamp']) ?></span>
+        <?php 
+        // Get recent tasks (activities)
+        $recent_tasks = getRecentActivities($connection, null, 10);
+        
+        if (empty($recent_tasks)): ?>
+            <p>No recent activity found.</p>
+        <?php else: ?>
+            <?php foreach ($recent_tasks as $task): ?>
+            <div class="activity-item">
+                <div class="activity-avatar"><?= getInitials($task['full_name']) ?></div>
+                <div class="activity-content">
+                    <div>
+                        <strong><?= htmlspecialchars($task['full_name']) ?></strong>
+                        <?php if ($task['status'] == 'completed'): ?>
+                            completed task:
+                        <?php else: ?>
+                            worked on task:
+                        <?php endif; ?>
+                        <strong><?= htmlspecialchars($task['title']) ?></strong>
+                        <?php if (!empty($task['description'])): ?>
+                            - <?= htmlspecialchars($task['description']) ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="activity-meta">
+                        <?php if (!empty($task['deadline'])): ?>
+                            <span>Due: <?= formatDateTime($task['deadline']) ?></span>
+                            <span>•</span>
+                        <?php endif; ?>
+                        <span><?= formatDateTime($task['timestamp']) ?></span>
+                        <span>•</span>
+                        <span class="status-<?= $task['status'] ?>"><?= ucfirst($task['status']) ?></span>
+                    </div>
                 </div>
             </div>
-        </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </div>
         
