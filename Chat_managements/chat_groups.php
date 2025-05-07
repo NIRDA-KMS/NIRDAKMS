@@ -5,6 +5,7 @@ $user = 'root';
 $pass = '';
 $dbname = 'NIRDAKMS';
 
+
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -524,6 +525,243 @@ if (isset($_GET['action'])) {
                 echo json_encode(['success' => $stmt->rowCount() > 0]);
                 break;
                 
+            case 'delete_group':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+
+                $groupId = $_POST['group_id'] ?? null;
+                if (!$groupId) {
+                    echo json_encode(['error' => 'Group ID missing']);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("SELECT created_by FROM chat_groups WHERE group_id = ?");
+                $stmt->execute([$groupId]);
+                $group = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$group || $group['created_by'] != $_SESSION['user_id']) {
+                    echo json_encode(['error' => 'Only group creator can delete the group']);
+                    exit;
+                }
+
+                $pdo->beginTransaction();
+
+                try {
+                    $pdo->prepare("DELETE FROM messages WHERE group_id = ?")->execute([$groupId]);
+                    $pdo->prepare("DELETE FROM group_members WHERE group_id = ?")->execute([$groupId]);
+                    $pdo->prepare("DELETE FROM group_invitations WHERE group_id = ?")->execute([$groupId]);
+                    $pdo->prepare("DELETE FROM chat_groups WHERE group_id = ?")->execute([$groupId]);
+
+                    $pdo->commit();
+                    echo json_encode(['success' => true]);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    echo json_encode(['error' => 'Failed to delete group: ' . $e->getMessage()]);
+                }
+                break;
+
+            case 'upload_file':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+
+                if (!isset($_FILES['file'])) {
+                    echo json_encode(['error' => 'No file uploaded']);
+                    exit;
+                }
+
+                $file = $_FILES['file'];
+                $allowedTypes = [
+                    'image/jpeg', 'image/png', 'image/gif', 'application/pdf',
+                    'application/msword', 'application/vnd.ms-excel',
+                    'text/plain', 'application/zip'
+                ];
+
+                if (!in_array($file['type'], $allowedTypes)) {
+                    echo json_encode(['error' => 'File type not allowed']);
+                    exit;
+                }
+
+                if ($file['size'] > 10 * 1024 * 1024) {
+                    echo json_encode(['error' => 'File size too large (max 10MB)']);
+                    exit;
+                }
+
+                $uploadDir = 'storage/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $filename = uniqid() . '_' . basename($file['name']);
+                $filepath = $uploadDir . $filename;
+
+                if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                    $stmt = $pdo->prepare("INSERT INTO files (filename, filepath, size, type, uploaded) VALUES (?, ?, ?, ?, NOW())");
+                    $stmt->execute([$file['name'], $filepath, $file['size'], $file['type']]);
+
+                    echo json_encode([
+                        'success' => true,
+                        'file_id' => $pdo->lastInsertId(),
+                        'file_name' => $file['name'],
+                        'file_type' => $file['type'],
+                        'file_size' => $file['size'],
+                        'file_path' => $filepath
+                    ]);
+                } else {
+                    echo json_encode(['error' => 'Failed to upload file']);
+                }
+                break;
+
+            case 'attach_file_to_message':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+
+                $messageId = $_POST['message_id'] ?? null;
+                $fileId = $_POST['file_id'] ?? null;
+
+                if (!$messageId || !$fileId) {
+                    echo json_encode(['error' => 'Missing parameters']);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("SELECT * FROM files WHERE id = ?");
+                $stmt->execute([$fileId]);
+                $file = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$file) {
+                    echo json_encode(['error' => 'File not found']);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("INSERT INTO message_attachments (message_id, file_id, file_name, file_type, file_size, file_path, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                $stmt->execute([$messageId, $fileId, $file['filename'], $file['type'], $file['size'], $file['filepath']]);
+
+                echo json_encode(['success' => true, 'attachment_id' => $pdo->lastInsertId()]);
+                break;
+
+            case 'update_profile_picture':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+
+                if (!isset($_FILES['profile_picture'])) {
+                    echo json_encode(['error' => 'No file uploaded']);
+                    exit;
+                }
+
+                $file = $_FILES['profile_picture'];
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+
+                if (!in_array($file['type'], $allowedTypes)) {
+                    echo json_encode(['error' => 'Only JPEG, PNG, and GIF images are allowed']);
+                    exit;
+                }
+
+                if ($file['size'] > 2 * 1024 * 1024) {
+                    echo json_encode(['error' => 'Image size too large (max 2MB)']);
+                    exit;
+                }
+
+                $uploadDir = 'profile_pictures/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+
+                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $filename = 'profile_' . $_SESSION['user_id'] . '_' . time() . '.' . $ext;
+                $filepath = $uploadDir . $filename;
+
+                if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO user_profiles (user_id, profile_picture, updated_at)
+                        VALUES (?, ?, NOW())
+                        ON DUPLICATE KEY UPDATE profile_picture = VALUES(profile_picture), updated_at = NOW()
+                    ");
+                    $stmt->execute([$_SESSION['user_id'], $filepath]);
+
+                    echo json_encode(['success' => true, 'profile_picture' => $filepath]);
+                } else {
+                    echo json_encode(['error' => 'Failed to upload profile picture']);
+                }
+                break;
+
+            case 'update_user_status':
+                if (!isset($_SESSION['user_id'])) {
+                    echo json_encode(['error' => 'Not authenticated']);
+                    exit;
+                }
+
+                $status = $_POST['status'] ?? null;
+                $allowedStatuses = ['online', 'away', 'busy', 'offline'];
+
+                if (!$status || !in_array($status, $allowedStatuses)) {
+                    echo json_encode(['error' => 'Invalid status']);
+                    exit;
+                }
+
+                $isOnline = $status === 'online' ? 1 : 0;
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO user_profiles (user_id, status, updated_at)
+                    VALUES (?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE status = VALUES(status), updated_at = NOW()
+                ");
+                $stmt->execute([$_SESSION['user_id'], $status]);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO user_status (user_id, is_online, last_seen)
+                    VALUES (?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE is_online = VALUES(is_online), last_seen = NOW()
+                ");
+                $stmt->execute([$_SESSION['user_id'], $isOnline]);
+
+                echo json_encode(['success' => true]);
+                break;
+
+            case 'get_group_members':
+                $groupId = $_GET['group_id'] ?? null;
+
+                if (!$groupId) {
+                    echo json_encode(['error' => 'Group ID required']);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("
+                    SELECT u.user_id, u.full_name, u.email, gm.is_admin,
+                           up.profile_picture, up.status, us.is_online, us.last_seen
+                    FROM group_members gm
+                    JOIN users u ON gm.user_id = u.user_id
+                    LEFT JOIN user_profiles up ON u.user_id = up.user_id
+                    LEFT JOIN user_status us ON u.user_id = us.user_id
+                    WHERE gm.group_id = ?
+                ");
+                $stmt->execute([$groupId]);
+                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                echo json_encode($members);
+                break;
+
+            case 'get_message_attachments':
+                $messageId = $_GET['message_id'] ?? null;
+
+                if (!$messageId) {
+                    echo json_encode(['error' => 'Message ID required']);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("SELECT * FROM message_attachments WHERE message_id = ?");
+                $stmt->execute([$messageId]);
+                $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                echo json_encode($attachments);
+                break;
+                
             case 'delete_message':
                 if (!isset($_SESSION['user_id']) || !isset($_POST['message_id'])) {
                     echo json_encode(['error' => 'Missing parameters']);
@@ -614,6 +852,8 @@ if (isset($_GET['action'])) {
     }
     exit;
 }
+
+// ... (rest of your HTML/JavaScript code remains the same)
 
 // Frontend HTML/JS
 ?>
@@ -1261,6 +1501,188 @@ if (isset($_GET['action'])) {
                 display: flex;
             }
         }
+
+  /* Add to for remaining  features CSS in chat_groups.php */
+
+/* File attachment styles */
+.attachment-container {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    background-color: #f0f2f5;
+    display: flex;
+    align-items: center;
+}
+
+.attachment-icon {
+    margin-right: 10px;
+    font-size: 20px;
+    color: #65676b;
+}
+
+.attachment-info {
+    flex: 1;
+}
+
+.attachment-name {
+    font-weight: 500;
+    margin-bottom: 3px;
+    word-break: break-all;
+}
+
+.attachment-size {
+    font-size: 12px;
+    color: #65676b;
+}
+
+.attachment-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+/* Profile picture upload */
+.profile-picture-container {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+}
+
+.profile-picture {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #0084ff;
+}
+
+.profile-picture-upload {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #0084ff;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+/* Group deletion button */
+.delete-group-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+.delete-group-btn:hover {
+    background-color: #c82333;
+}
+
+/* File upload button */
+.file-upload-btn {
+    background: none;
+    border: none;
+    color: #0084ff;
+    font-size: 18px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+/* Status indicators */
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 5px;
+}
+
+.status-online-badge {
+    background-color: #31a24c;
+    color: white;
+}
+
+.status-offline-badge {
+    background-color: #65676b;
+    color: white;
+}
+
+.status-away-badge {
+    background-color: #ffaa00;
+    color: white;
+}
+
+.status-busy-badge {
+    background-color: #ff4d4d;
+    color: white;
+}
+
+/* Modal for file preview */
+.file-preview-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+}
+
+.file-preview-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 80%;
+    max-height: 80vh;
+    overflow: auto;
+    text-align: center;
+}
+
+.file-preview-content img {
+    max-width: 100%;
+    max-height: 70vh;
+}
+
+.file-preview-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+}
+
+/* Progress bar for file uploads */
+.upload-progress {
+    width: 100%;
+    height: 5px;
+    background: #e0e0e0;
+    margin-top: 5px;
+    border-radius: 5px;
+    overflow: hidden;
+    display: none;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    background: #0084ff;
+    width: 0%;
+    transition: width 0.3s;
+}
     </style>
 </head>
 <body>
@@ -1376,6 +1798,7 @@ if (isset($_GET['action'])) {
             <div class="modal-footer">
                 <button class="cancel" id="cancel-edit-group">Cancel</button>
                 <button class="submit" id="save-group">Save</button>
+                <button class="delete-group-btn" id="delete-group-btn">Delete Group</button>
             </div>
         </div>
     </div>
@@ -1394,6 +1817,13 @@ if (isset($_GET['action'])) {
                 <div class="loading">Loading contacts...</div>
             </div>
         </div>
+        <div class="profile-picture-container">
+    <img src="default-profile.jpg" alt="Profile Picture" class="profile-picture" id="profile-picture">
+    <div class="profile-picture-upload" title="Change profile picture">
+        <i class="fas fa-camera"></i>
+        <input type="file" id="profile-picture-input" accept="image/*" style="display: none;">
+    </div>
+</div>
     </div>
     
     <script>
@@ -1489,6 +1919,91 @@ if (isset($_GET['action'])) {
                     }
                 }
             }
+
+            // Delete group button
+document.getElementById('delete-group-btn')?.addEventListener('click', () => {
+    if (currentGroup) {
+        deleteGroup(currentGroup.group_id);
+    }
+});
+
+// File upload
+document.getElementById('file-upload-btn')?.addEventListener('click', () => {
+    document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input')?.addEventListener('change', async (e) => {
+    if (e.target.files.length > 0 && currentChat) {
+        const file = e.target.files[0];
+        const uploadResult = await uploadFile(file);
+        
+        if (uploadResult.error) {
+            alert(uploadResult.error);
+            return;
+        }
+        
+        // Create a message with the file
+        const messageContent = `[File: ${file.name}]`;
+        const messageResult = await sendMessage(currentChat, messageContent);
+        
+        if (messageResult.error) {
+            alert(messageResult.error);
+            return;
+        }
+        
+        // Attach the file to the message
+        await attachFileToMessage(messageResult.message_id, uploadResult.file_id);
+        
+        // Refresh the chat
+        await renderChat(currentChat);
+        renderChatList(currentFilter);
+    }
+});
+
+// Profile picture upload
+document.querySelector('.profile-picture-upload')?.addEventListener('click', () => {
+    document.getElementById('profile-picture-input').click();
+});
+
+document.getElementById('profile-picture-input')?.addEventListener('change', async (e) => {
+    if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const result = await updateProfilePicture(file);
+        
+        if (result.error) {
+            alert(result.error);
+        } else {
+            // Update profile picture display
+            document.getElementById('profile-picture').src = result.profile_picture;
+            // Refresh any views that show the profile picture
+            renderChatList(currentFilter);
+            if (currentChat) {
+                renderChat(currentChat);
+            }
+        }
+    }
+});
+
+// Update user status when window gains/loses focus
+window.addEventListener('focus', () => {
+    updateUserStatus('online');
+});
+
+window.addEventListener('blur', () => {
+    updateUserStatus('away');
+});
+
+// Update status on page load
+document.addEventListener('DOMContentLoaded', () => {
+    updateUserStatus('online');
+});
+
+// Update status before page unload
+window.addEventListener('beforeunload', () => {
+    // Note: This may not always work due to browser restrictions
+    navigator.sendBeacon('chat_groups.php?action=update_user_status', 
+        new URLSearchParams({status: 'offline'}));
+});
             
             // Update chat list to show new message
             renderChatList(currentFilter);
@@ -1709,6 +2224,104 @@ if (isset($_GET['action'])) {
                 return { error: error.message };
             }
         }
+
+
+        // additional features
+        // Function to delete a group
+async function deleteGroup(groupId) {
+    if (confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
+        const formData = new FormData();
+        formData.append('group_id', groupId);
+        
+        const response = await fetch('chat_groups.php?action=delete_group', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.error) {
+            alert(result.error);
+        } else {
+            // Close group info modal
+            editGroupModal.style.display = 'none';
+            
+            // If we were viewing the deleted group, clear the chat view
+            if (currentChat && currentChat.type === 'group' && currentChat.group_id == groupId) {
+                currentChat = null;
+                mainChat.innerHTML = `
+                    <div class="empty-chat">
+                        <div class="empty-chat-icon">💬</div>
+                        <h3>Select a chat to start messaging</h3>
+                    </div>
+                `;
+            }
+            
+            // Refresh chat list
+            renderChatList(currentFilter);
+        }
+    }
+}
+
+// Function to upload a file
+async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('chat_groups.php?action=upload_file', {
+        method: 'POST',
+        body: formData
+    });
+    
+    return await response.json();
+}
+
+// Function to attach file to message
+async function attachFileToMessage(messageId, fileId) {
+    const formData = new FormData();
+    formData.append('message_id', messageId);
+    formData.append('file_id', fileId);
+    
+    const response = await fetch('chat_groups.php?action=attach_file_to_message', {
+        method: 'POST',
+        body: formData
+    });
+    
+    return await response.json();
+}
+
+// Function to update profile picture
+async function updateProfilePicture(file) {
+    const formData = new FormData();
+    formData.append('profile_picture', file);
+    
+    const response = await fetch('chat_groups.php?action=update_profile_picture', {
+        method: 'POST',
+        body: formData
+    });
+    
+    return await response.json();
+}
+
+// Function to update user status
+async function updateUserStatus(status) {
+    const formData = new FormData();
+    formData.append('status', status);
+    
+    const response = await fetch('chat_groups.php?action=update_user_status', {
+        method: 'POST',
+        body: formData
+    });
+    
+    return await response.json();
+}
+
+// Function to get message attachments
+async function getMessageAttachments(messageId) {
+    const response = await fetch(`chat_groups.php?action=get_message_attachments&message_id=${messageId}`);
+    return await response.json();
+}
+        ////////////
         
         // Create a new group
         async function createGroup(name, description, members) {
@@ -2300,6 +2913,8 @@ if (isset($_GET['action'])) {
             `;
             
             // Update main chat area
+
+            
             mainChat.innerHTML = `
                 <div class="chat-header">
                     <div class="chat-header-left">
@@ -2320,6 +2935,10 @@ if (isset($_GET['action'])) {
                     ${messagesHTML}
                 </div>
                 <div class="chat-input">
+                <button class="file-upload-btn" id="file-upload-btn" title="Attach file">
+    <i class="fas fa-paperclip"></i>
+    <input type="file" id="file-input" style="display: none;">
+</button>
                     ${inputHTML}
                 </div>
             `;
