@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 05, 2025 at 04:06 PM
+-- Generation Time: May 07, 2025 at 12:17 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.0.30
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -75,6 +75,13 @@ CREATE TABLE `blocked_users` (
   `blocked_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `blocked_users`
+--
+
+INSERT INTO `blocked_users` (`block_id`, `blocker_id`, `blocked_id`, `blocked_at`) VALUES
+(1, 11, 13, '2025-05-06 16:36:18');
+
 -- --------------------------------------------------------
 
 --
@@ -135,7 +142,8 @@ INSERT INTO `files` (`id`, `filename`, `filepath`, `size`, `type`, `uploaded`) V
 (44, '1267-UKWITEGETSE00024520250428101123.pdf', 'storage/6815ef6e65dfd.pdf', 371009, 'application/pdf', '2025-05-03 10:26:54'),
 (55, 'ben.pdf', 'storage/681645a02dea5.pdf', 34230, 'application/pdf', '2025-05-03 16:34:40'),
 (57, 'malnutrition app.pdf', 'storage/681660b085c61.pdf', 196556, 'application/pdf', '2025-05-03 18:30:08'),
-(58, 'GRACEDOCUMENTS.pdf', 'storage/6817a6658cf4b.pdf', 407992, 'application/pdf', '2025-05-04 17:39:49');
+(58, 'GRACEDOCUMENTS.pdf', 'storage/6817a6658cf4b.pdf', 407992, 'application/pdf', '2025-05-04 17:39:49'),
+(59, '52-professional-foundations-certificate-yves-rutembeza.png', 'storage/681a3b5217a19.png', 244293, 'image/png', '2025-05-06 16:39:46');
 
 -- --------------------------------------------------------
 
@@ -267,6 +275,22 @@ INSERT INTO `forum_topics` (`topic_id`, `category_id`, `user_id`, `title`, `cont
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `group_invitations`
+--
+
+CREATE TABLE `group_invitations` (
+  `invitation_id` int(11) NOT NULL,
+  `group_id` int(11) NOT NULL,
+  `inviter_id` int(11) NOT NULL,
+  `invitee_id` int(11) NOT NULL,
+  `status` enum('pending','accepted','rejected') DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `group_members`
 --
 
@@ -357,6 +381,23 @@ INSERT INTO `messages` (`message_id`, `conversation_id`, `group_id`, `sender_id`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `message_attachments`
+--
+
+CREATE TABLE `message_attachments` (
+  `attachment_id` int(11) NOT NULL,
+  `message_id` int(11) NOT NULL,
+  `file_id` int(11) NOT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `file_type` varchar(100) NOT NULL,
+  `file_size` int(11) NOT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `private_conversations`
 --
 
@@ -411,7 +452,8 @@ INSERT INTO `projects` (`project_id`, `project_name`, `description`, `project_te
 (5, 'database training', 'qwertyuio', 'Research Project', '2025-06-08', '2025-06-08', 'UI/UX DESIGN', 'qwertyui', NULL, '2025-05-04 14:46:36'),
 (6, 'Tutor Connect ', 'this project aims at connecting teachers and students', 'Team Collaboration', '2025-05-05', '2025-06-11', 'UI/UX DESIGN', 'hvgdhxvcfcf', NULL, '2025-05-04 18:45:51'),
 (7, 'Tutor Connect ', 'this project aims at connecting teachers and students', 'Team Collaboration', '2025-05-05', '2025-06-11', 'UI/UX DESIGN', 'hvgdhxvcfcf', NULL, '2025-05-04 18:48:53'),
-(8, 'Access to Financetyhj', 'ggg', 'Team Collaboration', '2025-05-14', '2025-05-22', 'this and this', 'ggggg', NULL, '2025-05-05 14:04:58');
+(8, 'Access to Financetyhj', 'ggg', 'Team Collaboration', '2025-05-14', '2025-05-22', 'this and this', 'ggggg', NULL, '2025-05-05 14:04:58'),
+(9, 'nirda collaboration', 'collaboration ends to next week', 'Team Collaboration', '2025-05-01', '2025-05-08', 'certificate', 'today is the day', NULL, '2025-05-06 16:39:10');
 
 -- --------------------------------------------------------
 
@@ -448,7 +490,8 @@ INSERT INTO `project_members` (`member_id`, `project_id`, `user_id`, `role`, `jo
 (30, 8, 14, 'database_admin', '2025-05-05 14:04:58'),
 (31, 8, 1, 'systems_admin', '2025-05-05 14:04:58'),
 (32, 8, 2, 'database_admin', '2025-05-05 14:04:58'),
-(33, 8, 4, 'cybersecurity_specialist', '2025-05-05 14:04:58');
+(33, 8, 4, 'cybersecurity_specialist', '2025-05-05 14:04:58'),
+(34, 9, 12, 'media_specialist', '2025-05-06 16:39:10');
 
 -- --------------------------------------------------------
 
@@ -535,7 +578,8 @@ INSERT INTO `tasks` (`id`, `title`, `description`, `status`, `priority`, `assign
 (33, 'authentication', 'dfg', 'done', 'high', 3, '2025-06-08', '2025-05-03 18:21:25', '2025-05-03 18:21:25', NULL),
 (34, 'authentication', '', 'in_progress', 'medium', 3, '2025-06-05', '2025-05-04 13:31:03', '2025-05-04 13:31:03', NULL),
 (35, 'kwiga', 'ertyuio', 'backlog', 'high', 3, '2025-06-08', '2025-05-04 13:59:11', '2025-05-04 13:59:11', NULL),
-(36, 'kwiga', 'asdfghjk.qwertyuio', 'in_progress', 'low', 2, '2025-05-31', '2025-05-04 17:42:54', '2025-05-04 17:42:54', NULL);
+(36, 'kwiga', 'asdfghjk.qwertyuio', 'in_progress', 'low', 2, '2025-05-31', '2025-05-04 17:42:54', '2025-05-04 17:42:54', NULL),
+(37, 'kkkk', 'nvcg ', 'backlog', 'high', 12, '0000-00-00', '2025-05-06 16:40:20', '2025-05-06 16:40:20', NULL);
 
 -- --------------------------------------------------------
 
@@ -575,11 +619,27 @@ INSERT INTO `users` (`user_id`, `username`, `email`, `password`, `full_name`, `r
 (8, 'Yves', 'yves.niy@example.com', '$2y$10$NpFJz8zR4nZ0bUZK4OFE1u4VBMv88JUNX6YHcRMF5bUJ2r59mjPiG', 'NIYONSENGA Yves', 1, 'Quality Assurance', '2', 'QA Monitoring', '0788888886', 'Kinyarwanda', 1, '2025-04-09 22:50:00', '2025-04-09 23:15:00'),
 (9, 'Carine', 'carine.k@example.com', '$2y$10$Re0H7xI5OfUOj7sRZ1UdeOTaLS4rF2Uj5u3YZCQN3vly4MPnAMZJq', 'KABANDA Carine', 3, 'Finance and Planning', '2', 'Budget Unit', '0788888887', 'English', 1, '2025-03-22 00:40:00', '2025-03-22 01:10:00'),
 (10, 'Elie', 'elie.m@example.com', '$2y$10$gXoCMUvUM9H1j8jVL3xJHO8uMe98a/1vU8VvZ57qJ6jF2rqL3PzK2', 'MUKIZA Elie', 2, 'Logistics & Operations', '3', 'Fleet Services', '0788888888', 'French', 1, '2025-03-30 02:10:00', '2025-03-30 02:40:00'),
-(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-04 20:13:40'),
-(12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-04-30 00:20:56'),
+(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-06 21:20:30'),
+(12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-05-06 22:08:35'),
 (13, 'ndoli', 'ndolijeandamascene@gmail.com', '12Damasce12@', 'NDOLI Jean Damascene', 0, NULL, NULL, NULL, NULL, 'English', 1, '2025-05-05 13:28:10', NULL),
 (14, 'ndolijean', 'jdamascene.ndoli@nirda.gov.rw', '$2y$10$H/5oDAJiGj/crJZsJ2oiq.eKv1XZlJd31FsQ3cj1uwbTJBq2GpYA2', 'NDOLI Jean Damascene', 3, NULL, NULL, NULL, '0789312765', 'English', 1, '2025-05-05 13:30:56', '2025-05-05 13:31:06'),
 (15, 'Umutabyi', 'umutambyicompanyltd@gmail.com', '$2y$10$MzIi1E.mpJSUrI1Ydq7/7.2w5fb1kmY0xxQmm6kF5IkHOEn4Nmr3u', 'UMUTABYI', 3, NULL, NULL, NULL, '07884645328', 'English', 1, '2025-05-05 13:36:08', '2025-05-05 13:36:19');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_profiles`
+--
+
+CREATE TABLE `user_profiles` (
+  `profile_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `profile_picture` varchar(255) DEFAULT NULL,
+  `status_message` varchar(255) DEFAULT NULL,
+  `status` enum('online','away','busy','offline') DEFAULT 'offline',
+  `theme_preference` varchar(50) DEFAULT 'light',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -633,6 +693,15 @@ ALTER TABLE `files`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `group_invitations`
+--
+ALTER TABLE `group_invitations`
+  ADD PRIMARY KEY (`invitation_id`),
+  ADD KEY `group_id` (`group_id`),
+  ADD KEY `inviter_id` (`inviter_id`),
+  ADD KEY `invitee_id` (`invitee_id`);
+
+--
 -- Indexes for table `group_members`
 --
 ALTER TABLE `group_members`
@@ -648,6 +717,13 @@ ALTER TABLE `messages`
   ADD KEY `conversation_id` (`conversation_id`),
   ADD KEY `group_id` (`group_id`),
   ADD KEY `sender_id` (`sender_id`);
+
+--
+-- Indexes for table `message_attachments`
+--
+ALTER TABLE `message_attachments`
+  ADD PRIMARY KEY (`attachment_id`),
+  ADD KEY `message_id` (`message_id`);
 
 --
 -- Indexes for table `private_conversations`
@@ -691,6 +767,13 @@ ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`);
 
 --
+-- Indexes for table `user_profiles`
+--
+ALTER TABLE `user_profiles`
+  ADD PRIMARY KEY (`profile_id`),
+  ADD UNIQUE KEY `user_id` (`user_id`);
+
+--
 -- Indexes for table `user_status`
 --
 ALTER TABLE `user_status`
@@ -716,7 +799,7 @@ ALTER TABLE `attendees`
 -- AUTO_INCREMENT for table `blocked_users`
 --
 ALTER TABLE `blocked_users`
-  MODIFY `block_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `block_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `chat_groups`
@@ -728,7 +811,13 @@ ALTER TABLE `chat_groups`
 -- AUTO_INCREMENT for table `files`
 --
 ALTER TABLE `files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
+
+--
+-- AUTO_INCREMENT for table `group_invitations`
+--
+ALTER TABLE `group_invitations`
+  MODIFY `invitation_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `group_members`
@@ -743,22 +832,28 @@ ALTER TABLE `messages`
   MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
+-- AUTO_INCREMENT for table `message_attachments`
+--
+ALTER TABLE `message_attachments`
+  MODIFY `attachment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `private_conversations`
 --
 ALTER TABLE `private_conversations`
-  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `project_members`
 --
 ALTER TABLE `project_members`
-  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `starred_conversations`
@@ -770,13 +865,19 @@ ALTER TABLE `starred_conversations`
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
   MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+
+--
+-- AUTO_INCREMENT for table `user_profiles`
+--
+ALTER TABLE `user_profiles`
+  MODIFY `profile_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables
@@ -803,6 +904,14 @@ ALTER TABLE `chat_groups`
   ADD CONSTRAINT `fk_group_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Constraints for table `group_invitations`
+--
+ALTER TABLE `group_invitations`
+  ADD CONSTRAINT `fk_invitation_group` FOREIGN KEY (`group_id`) REFERENCES `chat_groups` (`group_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_invitation_invitee` FOREIGN KEY (`invitee_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_invitation_inviter` FOREIGN KEY (`inviter_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `group_members`
 --
 ALTER TABLE `group_members`
@@ -818,6 +927,12 @@ ALTER TABLE `messages`
   ADD CONSTRAINT `fk_message_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `message_attachments`
+--
+ALTER TABLE `message_attachments`
+  ADD CONSTRAINT `fk_attachment_message` FOREIGN KEY (`message_id`) REFERENCES `messages` (`message_id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `private_conversations`
 --
 ALTER TABLE `private_conversations`
@@ -831,6 +946,12 @@ ALTER TABLE `starred_conversations`
   ADD CONSTRAINT `fk_starred_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `private_conversations` (`conversation_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_starred_group` FOREIGN KEY (`group_id`) REFERENCES `chat_groups` (`group_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_starred_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_profiles`
+--
+ALTER TABLE `user_profiles`
+  ADD CONSTRAINT `fk_profile_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `user_status`
