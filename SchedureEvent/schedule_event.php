@@ -6,6 +6,13 @@ ini_set('display_errors', 1);
 // Database connection
 include('connect.php');
 
+// Include Composer autoloader
+require __DIR__ . '/../vendor/autoload.php';
+
+// Import PHPMailer classes
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 // Check connection
 if (!$connection) {
     die("Database connection failed: " . mysqli_connect_error());
@@ -131,9 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                     
                     // Send initial confirmation to attendees if email reminder is enabled
                     if ($emailReminder) {
-                      require __DIR__ . '/../vendor/autoload.php';
                         $mail = new PHPMailer(true);
-                        
+
                         try {
                             // SMTP configuration
                             $mail->isSMTP();
@@ -141,19 +147,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                             $mail->SMTPAuth   = true;
                             $mail->Username   = 'rurangirwakhassim84@gmail.com';
                             $mail->Password   = 'cbsu vzxr jvgq oiol';
-                            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                             $mail->Port       = 587;
-                            
+
                             $mail->setFrom('no-reply@nirdakms.com', 'NIRDA Event System');
                             $mail->isHTML(true);
-                            
+
                             $startDate = new DateTime($startingdate);
                             $endDate = new DateTime($endingdate);
-                            
+
                             foreach ($emails as $email) {
                                 $mail->clearAddresses();
                                 $mail->addAddress($email);
-                                
+
                                 $mail->Subject = "Invitation: " . $eventtitle;
                                 $mail->Body    = "
                                     <h2>You're Invited!</h2>
@@ -165,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['createEvent'])) {
                                     <p><strong>Description:</strong> {$description}</p>
                                     <p>You will receive a reminder {$reminderTime} minutes before the event.</p>
                                 ";
-                                
+
                                 $mail->send();
                             }
                         } catch (Exception $e) {
