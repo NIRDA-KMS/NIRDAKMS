@@ -397,7 +397,7 @@ function subscribeToTopic($data) {
     global $conn;
     
     $topic_id = intval($data['topic_id']);
-    $user_id = isset($data['user_id']) ? $data['user_id'] : $_SESSION['user_id'];
+    $user_id = isset($data['user_id']) ? intval($data['user_id']) : $_SESSION['user_id'];
     
     // Check if already subscribed
     $check = $conn->prepare("SELECT subscription_id FROM forum_subscriptions WHERE topic_id = ? AND user_id = ?");
@@ -405,7 +405,7 @@ function subscribeToTopic($data) {
     $check->execute();
     
     if ($check->get_result()->num_rows > 0) {
-        return ['error' => 'Already subscribed to this topic'];
+        return ['success' => true, 'message' => 'Already subscribed to this topic'];
     }
     
     // Add subscription
@@ -419,12 +419,11 @@ function subscribeToTopic($data) {
     return ['success' => true, 'message' => 'Subscribed to topic successfully'];
 }
 
-function unsubscribeFromTopic() {
+function unsubscribeFromTopic($data) {
     global $conn;
     
-    $data = json_decode(file_get_contents('php://input'), true);
     $topic_id = intval($data['topic_id']);
-    $user_id = $_SESSION['user_id'];
+    $user_id = isset($data['user_id']) ? intval($data['user_id']) : $_SESSION['user_id'];
     
     $stmt = $conn->prepare("DELETE FROM forum_subscriptions WHERE topic_id = ? AND user_id = ?");
     $stmt->bind_param("ii", $topic_id, $user_id);
@@ -433,7 +432,7 @@ function unsubscribeFromTopic() {
         throw new Exception('Failed to unsubscribe from topic');
     }
     
-    return ['success' => true];
+    return ['success' => true, 'message' => 'Unsubscribed successfully'];
 }
 
 function getForumStats() {
