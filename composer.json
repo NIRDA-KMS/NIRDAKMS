@@ -1,4 +1,13 @@
 {
+    "name": "nirda/kms-schedule-event",
+    "description": "sending email",
+    "type": "composer-plugin",
+    "authors": [
+        {
+            "name": "y"
+        }
+    ],
+    "minimum-stability": "alpha",
     "require": {
         "phpmailer/phpmailer": "^6.10"
     }
