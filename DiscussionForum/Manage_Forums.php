@@ -887,31 +887,48 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
          * View a specific topic
          */
         function viewTopic(topicId) {
-            currentTopicId = topicId;
+    currentTopicId = topicId;
+    
+    fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
             
-            fetch(`${API_BASE_URL}?action=get_topic&topic_id=${topicId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                        return;
-                    }
-                    
-                    const topic = data.topic;
-                    document.getElementById('viewTopicTitle').textContent = topic.title;
-                    document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
-                    document.getElementById('viewTopicMeta').innerHTML = `
-                        Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
-                    `;
-                    document.getElementById('viewTopicContent').innerHTML = topic.content;
+            const topic = data.topic;
+            document.getElementById('viewTopicTitle').textContent = topic.title;
+            document.getElementById('viewTopicTitle').dataset.topicId = topic.id;
+            document.getElementById('viewTopicMeta').innerHTML = `
+                Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}
+            `;
+            document.getElementById('viewTopicContent').innerHTML = topic.content;
 
-                    // Check subscription status
-                    currentTopicSubscribed = data.is_subscribed;
-                    updateSubscriptionButton();
+            // Check subscription status
+            currentTopicSubscribed = data.is_subscribed;
+            updateSubscriptionButton();
                     
-                    // Load replies
-                    const repliesContainer = document.getElementById('topicReplies');
-                    repliesContainer.innerHTML = '<h3>Replies</h3>';
+            // Load replies
+            const repliesContainer = document.getElementById('topicReplies');
+            repliesContainer.innerHTML = '<h3>Replies</h3>';
+
+
+                        // Add subscription controls if they don't exist
+                        if (!document.getElementById('subscriptionControls')) {
+                const subscriptionControls = document.createElement('div');
+                subscriptionControls.id = 'subscriptionControls';
+                subscriptionControls.className = 'subscription-controls';
+                subscriptionControls.innerHTML = `
+                    <button class="subscribe-btn" id="subscribeBtn" style="display: none;">Subscribe</button>
+                    <button class="unsubscribe-btn" id="unsubscribeBtn" style="display: none;">Unsubscribe</button>`;
+                repliesContainer.appendChild(subscriptionControls);
+                
+                // Add event listeners for subscription buttons
+                document.getElementById('subscribeBtn').addEventListener('click', () => subscribeToTopic(topicId));
+                document.getElementById('unsubscribeBtn').addEventListener('click', () => unsubscribeFromTopic(topicId));
+            }
+            updateSubscriptionButton();
 
                     // Add subscription controls
                     const subscriptionControls = document.createElement('div');
@@ -960,11 +977,11 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                     
                     document.getElementById('topicViewModal').style.display = 'flex';
                 })
-                .catch(error => {
-                    console.error('Error loading topic:', error);
-                    alert('Failed to load topic');
-                });
-        }
+        .catch(error => {
+            console.error('Error loading topic:', error);
+            alert('Failed to load topic');
+        });
+}
 
         /**
          * Update subscription button visibility
@@ -983,64 +1000,64 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
          * Subscribe to a topic
          */
         function subscribeToTopic(topicId) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'subscribe_topic',
-                    topic_id: topicId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                currentTopicSubscribed = true;
-                updateSubscriptionButton();
-                alert('You have subscribed to this topic');
-            })
-            .catch(error => {
-                console.error('Error subscribing to topic:', error);
-                alert('Failed to subscribe');
-            });
+    fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'subscribe_topic',
+            topic_id: topicId,
+            user_id: currentUserId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
         }
-
+        
+        currentTopicSubscribed = true;
+        updateSubscriptionButton();
+        alert('You have subscribed to this topic');
+    })
+    .catch(error => {
+        console.error('Error subscribing to topic:', error);
+        alert('Failed to subscribe');
+    });
+}
         /**
          * Unsubscribe from a topic
          */
         function unsubscribeFromTopic(topicId) {
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'unsubscribe_topic',
-                    topic_id: topicId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                currentTopicSubscribed = false;
-                updateSubscriptionButton();
-                alert('You have unsubscribed from this topic');
-            })
-            .catch(error => {
-                console.error('Error unsubscribing from topic:', error);
-                alert('Failed to unsubscribe');
-            });
+    fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'unsubscribe_topic',
+            topic_id: topicId,
+            user_id: currentUserId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
         }
-
+        
+        currentTopicSubscribed = false;
+        updateSubscriptionButton();
+        alert('You have unsubscribed from this topic');
+    })
+    .catch(error => {
+        console.error('Error unsubscribing from topic:', error);
+        alert('Failed to unsubscribe');
+    });
+}
         /**
          * Show create topic modal
          */
@@ -1108,45 +1125,46 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
          * Handle reply submission
          */
         function handleReplySubmit() {
-            if (!currentTopicId) {
-                alert('No topic selected. Please view a topic before replying.');
-                return;
-            }
-            
-            const content = document.getElementById('replyContent').value;
-            
-            if (!content.trim()) {
-                alert('Please enter reply content');
-                return;
-            }
-            
-            fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'create_reply',
-                    topic_id: currentTopicId,
-                    content: content
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                document.getElementById('replyContent').value = '';
-                viewTopic(currentTopicId); // Refresh the view
-                loadTopics(); // Update topic list counts
-            })
-            .catch(error => {
-                console.error('Error creating reply:', error);
-                alert('Failed to create reply');
-            });
+    if (!currentTopicId || currentTopicId === 0) {
+        alert('No topic selected. Please view a topic before replying.');
+        return;
+    }
+    
+    const content = document.getElementById('replyContent').value;
+    
+    if (!content.trim()) {
+        alert('Please enter reply content');
+        return;
+    }
+    
+    fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'create_reply',
+            topic_id: currentTopicId,
+            content: content,
+            user_id: currentUserId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
         }
+        
+        document.getElementById('replyContent').value = '';
+        viewTopic(currentTopicId); // Refresh the view
+        loadTopics(); // Update topic list counts
+    })
+    .catch(error => {
+        console.error('Error creating reply:', error);
+        alert('Failed to create reply');
+    });
+}
 
         /**
          * Show review reports modal

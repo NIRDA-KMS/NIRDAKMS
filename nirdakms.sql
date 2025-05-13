@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 07, 2025 at 12:17 AM
+-- Generation Time: May 13, 2025 at 10:06 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -105,7 +105,7 @@ CREATE TABLE `chat_groups` (
 INSERT INTO `chat_groups` (`group_id`, `group_name`, `description`, `created_by`, `created_at`, `updated_at`, `is_active`) VALUES
 (1, 'welcome', 'group welcome', 11, '2025-04-28 18:46:40', '2025-04-28 20:50:15', 1),
 (2, 'nice', 'its good', 11, '2025-04-28 18:47:05', '2025-04-28 18:47:14', 1),
-(3, 'family', 'family friends', 11, '2025-04-28 20:24:49', '2025-04-28 20:24:49', 1),
+(3, 'family', 'family friends', 11, '2025-04-28 20:24:49', '2025-05-07 00:16:34', 1),
 (4, 'YB_CREATIVITY', 'FOUNDATION', 11, '2025-04-28 20:25:14', '2025-04-28 20:25:14', 1),
 (5, 'family group', 'welcome home', 11, '2025-04-28 22:15:46', '2025-04-28 22:15:46', 1),
 (6, 'welcome home', 'wl', 11, '2025-04-28 22:16:29', '2025-04-29 21:08:36', 1),
@@ -113,11 +113,11 @@ INSERT INTO `chat_groups` (`group_id`, `group_name`, `description`, `created_by`
 (8, 'FAMILY', 'family chats', 11, '2025-04-29 21:38:04', '2025-04-29 21:38:04', 1),
 (9, 'welcome', 'this is inv', 11, '2025-04-29 21:42:07', '2025-04-29 21:42:07', 1),
 (10, 'ss', 'sns', 12, '2025-04-29 23:09:35', '2025-04-29 23:09:35', 1),
-(11, 'welcome', 'nice', 12, '2025-04-30 01:23:14', '2025-04-30 01:23:14', 1),
+(11, 'mhhh', 'mg', 12, '2025-04-30 01:23:14', '2025-05-08 09:41:51', 1),
 (12, 'welcome', '', 11, '2025-04-30 01:38:25', '2025-04-30 01:38:25', 1),
 (13, 'NIRDA GROUP', 'NIRDA TEAM WORK', 11, '2025-04-30 07:52:19', '2025-04-30 07:52:34', 1),
-(14, 'shsjs', '', 11, '2025-04-30 08:08:06', '2025-04-30 08:08:17', 1),
-(15, 'ssss', 'ss', 11, '2025-05-04 20:14:18', '2025-05-04 20:14:18', 1);
+(14, 'shsjs', '', 11, '2025-04-30 08:08:06', '2025-05-07 17:31:43', 1),
+(15, 'ssss', 'ss', 11, '2025-05-04 20:14:18', '2025-05-07 00:15:09', 1);
 
 -- --------------------------------------------------------
 
@@ -143,7 +143,8 @@ INSERT INTO `files` (`id`, `filename`, `filepath`, `size`, `type`, `uploaded`) V
 (55, 'ben.pdf', 'storage/681645a02dea5.pdf', 34230, 'application/pdf', '2025-05-03 16:34:40'),
 (57, 'malnutrition app.pdf', 'storage/681660b085c61.pdf', 196556, 'application/pdf', '2025-05-03 18:30:08'),
 (58, 'GRACEDOCUMENTS.pdf', 'storage/6817a6658cf4b.pdf', 407992, 'application/pdf', '2025-05-04 17:39:49'),
-(59, '52-professional-foundations-certificate-yves-rutembeza.png', 'storage/681a3b5217a19.png', 244293, 'image/png', '2025-05-06 16:39:46');
+(59, '52-professional-foundations-certificate-yves-rutembeza.png', 'storage/681a3b5217a19.png', 244293, 'image/png', '2025-05-06 16:39:46'),
+(60, 'congz.jpeg', 'storage/681c7b5669c5c.jpg', 81295, 'image/jpeg', '2025-05-08 09:37:26');
 
 -- --------------------------------------------------------
 
@@ -200,13 +201,20 @@ CREATE TABLE `forum_replies` (
 INSERT INTO `forum_replies` (`reply_id`, `topic_id`, `user_id`, `content`, `is_flagged`, `flag_reason`, `created_at`, `updated_at`) VALUES
 (1, 7, 11, 'yes welcome', 0, NULL, '2025-04-23 22:33:07', '2025-04-23 22:33:07'),
 (2, 7, 11, 'are you ready', 0, NULL, '2025-04-23 22:33:23', '2025-04-23 22:33:23'),
-(0, 7, 11, 'welcome why no replies yet', 0, NULL, '2025-04-25 12:50:30', '2025-04-25 12:50:30'),
-(0, 7, 11, 'this is work but others dont\\n', 0, NULL, '2025-04-25 12:50:45', '2025-04-25 12:50:45'),
-(0, 4, 11, 'murakoze', 0, NULL, '2025-04-25 12:50:56', '2025-04-25 12:50:56'),
-(0, 2, 11, 'nice to meet your', 0, NULL, '2025-04-25 12:51:09', '2025-04-25 12:51:09'),
-(0, 4, 11, 'now its time to work together', 0, NULL, '2025-04-28 17:29:43', '2025-04-28 17:29:43'),
-(0, 4, 11, 'ese nibyo koko', 0, NULL, '2025-04-28 17:29:50', '2025-04-28 17:29:50'),
-(0, 3, 11, 'murakoze', 0, NULL, '2025-04-28 17:30:00', '2025-04-28 17:30:00');
+(3, 7, 11, 'welcome why no replies yet', 0, NULL, '2025-04-25 12:50:30', '2025-04-25 12:50:30'),
+(4, 7, 11, 'this is work but others dont\\n', 0, NULL, '2025-04-25 12:50:45', '2025-04-25 12:50:45'),
+(5, 4, 11, 'murakoze', 0, NULL, '2025-04-25 12:50:56', '2025-04-25 12:50:56'),
+(6, 2, 11, 'nice to meet your', 0, NULL, '2025-04-25 12:51:09', '2025-04-25 12:51:09'),
+(7, 4, 11, 'now its time to work together', 0, NULL, '2025-04-28 17:29:43', '2025-04-28 17:29:43'),
+(8, 4, 11, 'ese nibyo koko', 0, NULL, '2025-04-28 17:29:50', '2025-04-28 17:29:50'),
+(9, 3, 11, 'murakoze', 0, NULL, '2025-04-28 17:30:00', '2025-04-28 17:30:00'),
+(12, 18, 11, 'welc do', 0, NULL, '2025-05-12 09:55:26', '2025-05-12 09:55:26'),
+(13, 18, 11, 'amzinga', 0, NULL, '2025-05-12 09:55:46', '2025-05-12 09:55:46'),
+(14, 18, 11, 'the best for to day subscirnve well \\n', 0, NULL, '2025-05-12 09:56:01', '2025-05-12 09:56:01'),
+(15, 18, 11, 'hello world!', 0, NULL, '2025-05-12 12:34:39', '2025-05-12 12:34:39'),
+(16, 15, 11, 'hvgvh', 0, NULL, '2025-05-12 13:13:25', '2025-05-12 13:13:25'),
+(17, 27, 11, 'gghh', 0, NULL, '2025-05-12 13:31:57', '2025-05-12 13:31:57'),
+(18, 27, 11, 'kss\\n', 0, NULL, '2025-05-12 13:36:31', '2025-05-12 13:36:31');
 
 -- --------------------------------------------------------
 
@@ -262,15 +270,17 @@ INSERT INTO `forum_topics` (`topic_id`, `category_id`, `user_id`, `title`, `cont
 (6, 14, 1, 'Second Topic', 'Content...', 0, 1, '2025-04-23 19:38:18', '2025-04-23 19:38:18'),
 (7, 13, 11, 'welcome', '<p>now now</p>', 0, 1, '2025-04-23 22:32:42', '2025-04-23 22:32:42'),
 (8, 13, 11, 'welcome', '<p>amata</p>', 0, 1, '2025-04-23 22:38:22', '2025-04-23 22:38:22'),
-(0, 14, 11, 'muraho', '<p>amazina nitwa rutembeza yves</p>', 0, 1, '2025-04-25 12:49:43', '2025-04-25 12:49:43'),
-(0, 13, 11, 'narbi', '<p>dksks</p>', 0, 1, '2025-04-25 12:51:43', '2025-04-25 12:51:43'),
-(0, 22, 11, 'yego se', '<p>nwmwmw</p>', 0, 1, '2025-04-25 12:52:30', '2025-04-25 12:52:30'),
-(0, 13, 11, 'yego murakoze', '<p>asante sana</p>', 0, 1, '2025-04-28 17:28:55', '2025-04-28 17:28:55'),
-(0, 23, 11, 'i need to invite you that i pyshed again', '<p>yego ko</p>', 0, 1, '2025-04-28 17:30:58', '2025-04-28 17:30:58'),
-(0, 0, 11, 'this is working', '<p>it is good</p>', 0, 1, '2025-04-28 20:14:39', '2025-04-28 20:14:39'),
-(0, 0, 12, 'welcome', '<p>this is the goode day</p>', 0, 1, '2025-04-29 23:39:29', '2025-04-29 23:39:29'),
-(0, 0, 12, 'amakuru', '<p>murakoze</p>', 0, 1, '2025-04-30 00:05:45', '2025-04-30 00:05:45'),
-(0, 0, 11, 'nice', '<p>wele</p>', 0, 1, '2025-04-30 01:18:05', '2025-04-30 01:18:05');
+(9, 14, 11, 'muraho', '<p>amazina nitwa rutembeza yves</p>', 0, 1, '2025-04-25 12:49:43', '2025-04-25 12:49:43'),
+(10, 13, 11, 'narbi', '<p>dksks</p>', 0, 1, '2025-04-25 12:51:43', '2025-04-25 12:51:43'),
+(11, 22, 11, 'yego se', '<p>nwmwmw</p>', 0, 1, '2025-04-25 12:52:30', '2025-04-25 12:52:30'),
+(12, 13, 11, 'yego murakoze', '<p>asante sana</p>', 0, 1, '2025-04-28 17:28:55', '2025-04-28 17:28:55'),
+(13, 23, 11, 'i need to invite you that i pyshed again', '<p>yego ko</p>', 0, 1, '2025-04-28 17:30:58', '2025-04-28 17:30:58'),
+(14, 0, 11, 'this is working', '<p>it is good</p>', 0, 1, '2025-04-28 20:14:39', '2025-04-28 20:14:39'),
+(15, 0, 12, 'welcome', '<p>this is the goode day</p>', 0, 1, '2025-04-29 23:39:29', '2025-04-29 23:39:29'),
+(16, 0, 12, 'amakuru', '<p>murakoze</p>', 0, 1, '2025-04-30 00:05:45', '2025-04-30 00:05:45'),
+(17, 0, 11, 'nice', '<p>wele</p>', 0, 1, '2025-04-30 01:18:05', '2025-04-30 01:18:05'),
+(18, 0, 11, 'welcome in this general course at nirda', '<ul>\\n<li>thanks for sharing najdn a s</li>\\n<li>jbhugWSHGHjnxasknkankas</li>\\n</ul>', 0, 1, '2025-05-12 08:09:34', '2025-05-12 08:09:34'),
+(27, 0, 11, 'amazing', '<p>welcome&nbsp;</p>\\n<p>hedmnmkksd</p>\\n<p>djkdkd</p>\\n<p>&nbsp;</p>', 0, 1, '2025-05-12 13:13:45', '2025-05-12 13:13:45');
 
 -- --------------------------------------------------------
 
@@ -321,7 +331,10 @@ INSERT INTO `group_members` (`member_id`, `group_id`, `user_id`, `joined_at`, `i
 (12, 12, 11, '2025-04-30 01:38:25', 1),
 (13, 13, 11, '2025-04-30 07:52:19', 1),
 (14, 14, 11, '2025-04-30 08:08:06', 1),
-(15, 15, 11, '2025-05-04 20:14:18', 1);
+(15, 15, 11, '2025-05-04 20:14:18', 1),
+(16, 15, 15, '2025-05-07 00:15:09', 0),
+(22, 14, 12, '2025-05-07 15:04:03', 0),
+(24, 11, 15, '2025-05-08 09:41:51', 0);
 
 -- --------------------------------------------------------
 
@@ -376,7 +389,9 @@ INSERT INTO `messages` (`message_id`, `conversation_id`, `group_id`, `sender_id`
 (29, 6, NULL, 15, 'umezute', '2025-05-05 13:37:45', 'sent', 0),
 (30, 6, NULL, 14, 'saw wowe x', '2025-05-05 13:38:05', 'sent', 0),
 (31, 6, NULL, 15, 'fresh 2', '2025-05-05 13:38:16', 'sent', 0),
-(32, 6, NULL, 15, 'good', '2025-05-05 13:38:22', 'sent', 0);
+(32, 6, NULL, 15, 'good', '2025-05-05 13:38:22', 'sent', 0),
+(33, NULL, 14, 11, 'kjhgf', '2025-05-07 17:31:42', 'sent', 0),
+(34, NULL, 14, 11, 'bhgv', '2025-05-07 17:31:43', 'sent', 0);
 
 -- --------------------------------------------------------
 
@@ -419,7 +434,8 @@ INSERT INTO `private_conversations` (`conversation_id`, `user1_id`, `user2_id`, 
 (3, 8, 11, '2025-04-29 23:45:19', NULL),
 (4, 14, 7, '2025-05-05 13:34:07', NULL),
 (5, 15, 13, '2025-05-05 13:36:31', '2025-05-05 13:36:36'),
-(6, 14, 15, '2025-05-05 13:37:11', '2025-05-05 13:38:22');
+(6, 14, 15, '2025-05-05 13:37:11', '2025-05-05 13:38:22'),
+(8, 12, 9, '2025-05-07 00:21:38', NULL);
 
 -- --------------------------------------------------------
 
@@ -453,7 +469,9 @@ INSERT INTO `projects` (`project_id`, `project_name`, `description`, `project_te
 (6, 'Tutor Connect ', 'this project aims at connecting teachers and students', 'Team Collaboration', '2025-05-05', '2025-06-11', 'UI/UX DESIGN', 'hvgdhxvcfcf', NULL, '2025-05-04 18:45:51'),
 (7, 'Tutor Connect ', 'this project aims at connecting teachers and students', 'Team Collaboration', '2025-05-05', '2025-06-11', 'UI/UX DESIGN', 'hvgdhxvcfcf', NULL, '2025-05-04 18:48:53'),
 (8, 'Access to Financetyhj', 'ggg', 'Team Collaboration', '2025-05-14', '2025-05-22', 'this and this', 'ggggg', NULL, '2025-05-05 14:04:58'),
-(9, 'nirda collaboration', 'collaboration ends to next week', 'Team Collaboration', '2025-05-01', '2025-05-08', 'certificate', 'today is the day', NULL, '2025-05-06 16:39:10');
+(9, 'nirda collaboration', 'collaboration ends to next week', 'Team Collaboration', '2025-05-01', '2025-05-08', 'certificate', 'today is the day', NULL, '2025-05-06 16:39:10'),
+(10, 'projectTest', 'EJEIDKDK\r\n', '', '2025-05-16', '2025-05-30', 'DKDKD', 'DKKDKD', NULL, '2025-05-08 09:36:17'),
+(11, 'nirdat collaboration forum', 'dfft', 'Team Collaboration', '2025-05-02', '2025-05-10', 'the goals of this project is to provide effectives action to all ', 'ggcv', NULL, '2025-05-08 10:06:12');
 
 -- --------------------------------------------------------
 
@@ -490,8 +508,12 @@ INSERT INTO `project_members` (`member_id`, `project_id`, `user_id`, `role`, `jo
 (30, 8, 14, 'database_admin', '2025-05-05 14:04:58'),
 (31, 8, 1, 'systems_admin', '2025-05-05 14:04:58'),
 (32, 8, 2, 'database_admin', '2025-05-05 14:04:58'),
-(33, 8, 4, 'cybersecurity_specialist', '2025-05-05 14:04:58'),
-(34, 9, 12, 'media_specialist', '2025-05-06 16:39:10');
+(33, 8, 4, 'cio', '2025-05-05 14:04:58'),
+(34, 9, 12, 'media_specialist', '2025-05-06 16:39:10'),
+(35, 10, 12, 'contributor', '2025-05-08 09:36:17'),
+(36, 11, 9, 'contributor', '2025-05-08 10:06:12'),
+(37, 11, 2, 'systems_admin', '2025-05-08 10:06:12'),
+(38, 11, 11, 'contributor', '2025-05-08 10:08:23');
 
 -- --------------------------------------------------------
 
@@ -539,6 +561,13 @@ CREATE TABLE `starred_conversations` (
   `starred_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `unstarred_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `starred_conversations`
+--
+
+INSERT INTO `starred_conversations` (`id`, `user_id`, `conversation_id`, `group_id`, `is_starred`, `starred_at`, `unstarred_at`) VALUES
+(2, 11, 2, NULL, 1, '2025-05-07 00:25:28', NULL);
 
 -- --------------------------------------------------------
 
@@ -619,8 +648,8 @@ INSERT INTO `users` (`user_id`, `username`, `email`, `password`, `full_name`, `r
 (8, 'Yves', 'yves.niy@example.com', '$2y$10$NpFJz8zR4nZ0bUZK4OFE1u4VBMv88JUNX6YHcRMF5bUJ2r59mjPiG', 'NIYONSENGA Yves', 1, 'Quality Assurance', '2', 'QA Monitoring', '0788888886', 'Kinyarwanda', 1, '2025-04-09 22:50:00', '2025-04-09 23:15:00'),
 (9, 'Carine', 'carine.k@example.com', '$2y$10$Re0H7xI5OfUOj7sRZ1UdeOTaLS4rF2Uj5u3YZCQN3vly4MPnAMZJq', 'KABANDA Carine', 3, 'Finance and Planning', '2', 'Budget Unit', '0788888887', 'English', 1, '2025-03-22 00:40:00', '2025-03-22 01:10:00'),
 (10, 'Elie', 'elie.m@example.com', '$2y$10$gXoCMUvUM9H1j8jVL3xJHO8uMe98a/1vU8VvZ57qJ6jF2rqL3PzK2', 'MUKIZA Elie', 2, 'Logistics & Operations', '3', 'Fleet Services', '0788888888', 'French', 1, '2025-03-30 02:10:00', '2025-03-30 02:40:00'),
-(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-06 21:20:30'),
-(12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-05-06 22:08:35'),
+(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-12 08:07:13'),
+(12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-05-07 00:19:48'),
 (13, 'ndoli', 'ndolijeandamascene@gmail.com', '12Damasce12@', 'NDOLI Jean Damascene', 0, NULL, NULL, NULL, NULL, 'English', 1, '2025-05-05 13:28:10', NULL),
 (14, 'ndolijean', 'jdamascene.ndoli@nirda.gov.rw', '$2y$10$H/5oDAJiGj/crJZsJ2oiq.eKv1XZlJd31FsQ3cj1uwbTJBq2GpYA2', 'NDOLI Jean Damascene', 3, NULL, NULL, NULL, '0789312765', 'English', 1, '2025-05-05 13:30:56', '2025-05-05 13:31:06'),
 (15, 'Umutabyi', 'umutambyicompanyltd@gmail.com', '$2y$10$MzIi1E.mpJSUrI1Ydq7/7.2w5fb1kmY0xxQmm6kF5IkHOEn4Nmr3u', 'UMUTABYI', 3, NULL, NULL, NULL, '07884645328', 'English', 1, '2025-05-05 13:36:08', '2025-05-05 13:36:19');
@@ -691,6 +720,22 @@ ALTER TABLE `chat_groups`
 --
 ALTER TABLE `files`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `forum_replies`
+--
+ALTER TABLE `forum_replies`
+  ADD PRIMARY KEY (`reply_id`),
+  ADD KEY `idx_topic` (`topic_id`),
+  ADD KEY `idx_user` (`user_id`);
+
+--
+-- Indexes for table `forum_topics`
+--
+ALTER TABLE `forum_topics`
+  ADD PRIMARY KEY (`topic_id`),
+  ADD KEY `idx_category` (`category_id`),
+  ADD KEY `idx_user` (`user_id`);
 
 --
 -- Indexes for table `group_invitations`
@@ -799,7 +844,7 @@ ALTER TABLE `attendees`
 -- AUTO_INCREMENT for table `blocked_users`
 --
 ALTER TABLE `blocked_users`
-  MODIFY `block_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `block_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `chat_groups`
@@ -811,7 +856,19 @@ ALTER TABLE `chat_groups`
 -- AUTO_INCREMENT for table `files`
 --
 ALTER TABLE `files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
+
+--
+-- AUTO_INCREMENT for table `forum_replies`
+--
+ALTER TABLE `forum_replies`
+  MODIFY `reply_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- AUTO_INCREMENT for table `forum_topics`
+--
+ALTER TABLE `forum_topics`
+  MODIFY `topic_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `group_invitations`
@@ -823,13 +880,13 @@ ALTER TABLE `group_invitations`
 -- AUTO_INCREMENT for table `group_members`
 --
 ALTER TABLE `group_members`
-  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `messages`
 --
 ALTER TABLE `messages`
-  MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `message_attachments`
@@ -841,25 +898,25 @@ ALTER TABLE `message_attachments`
 -- AUTO_INCREMENT for table `private_conversations`
 --
 ALTER TABLE `private_conversations`
-  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `project_members`
 --
 ALTER TABLE `project_members`
-  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
 
 --
 -- AUTO_INCREMENT for table `starred_conversations`
 --
 ALTER TABLE `starred_conversations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `tasks`
