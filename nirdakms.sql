@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 13, 2025 at 10:06 AM
+-- Generation Time: May 17, 2025 at 11:08 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -52,15 +52,16 @@ CREATE TABLE `attendees` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `attendees`
+-- -- Dumping data for table `attendees`
 --
 
 INSERT INTO `attendees` (`attendee_id`, `event_id`, `email`, `name`, `rsvp_status`, `reminder_sent`, `created_at`) VALUES
 (4, 4, 'test@example.com', NULL, 'pending', 0, '2025-04-24 22:29:34'),
 (6, 6, 'yvesrutembeza@gmail.com', NULL, 'pending', 1, '2025-04-24 22:50:17'),
 (7, 7, 'zayves111@gmail.com', NULL, 'pending', 1, '2025-04-24 23:18:39'),
-(8, 8, 'zayves111@gmail.com', NULL, 'pending', 1, '2025-04-24 23:28:52');
+(8, 8, 'zayves111@gmail.com', NULL, 'pending', 1, '2025-04-24 23:28:52'),
+(10, 0, 'mahofoide@gmail.com', NULL, 'pending', 0, '2025-05-13 10:29:31'),
+(11, 0, 'yvesrutembeza@gmail.com', NULL, 'pending', 0, '2025-05-13 13:07:46');
 
 -- --------------------------------------------------------
 
@@ -115,9 +116,10 @@ INSERT INTO `chat_groups` (`group_id`, `group_name`, `description`, `created_by`
 (10, 'ss', 'sns', 12, '2025-04-29 23:09:35', '2025-04-29 23:09:35', 1),
 (11, 'mhhh', 'mg', 12, '2025-04-30 01:23:14', '2025-05-08 09:41:51', 1),
 (12, 'welcome', '', 11, '2025-04-30 01:38:25', '2025-04-30 01:38:25', 1),
-(13, 'NIRDA GROUP', 'NIRDA TEAM WORK', 11, '2025-04-30 07:52:19', '2025-04-30 07:52:34', 1),
+(13, 'NIRDA GROUP', 'NIRDA TEAM WORK', 11, '2025-04-30 07:52:19', '2025-05-13 11:37:08', 1),
 (14, 'shsjs', '', 11, '2025-04-30 08:08:06', '2025-05-07 17:31:43', 1),
-(15, 'ssss', 'ss', 11, '2025-05-04 20:14:18', '2025-05-07 00:15:09', 1);
+(15, 'ssss', 'ss', 11, '2025-05-04 20:14:18', '2025-05-07 00:15:09', 1),
+(16, 'sksksks', 'gg', 11, '2025-05-13 11:28:25', '2025-05-13 11:29:07', 1);
 
 -- --------------------------------------------------------
 
@@ -173,9 +175,10 @@ INSERT INTO `forum_categories` (`id`, `category_name`, `description`, `permissio
 (22, 'NIRDA meetings', 'meetings today', 'private', '9,6,8', '', '2025-04-22 10:00:20', '2025-04-22 10:00:20'),
 (23, 'Nirdaforum1', 'this is the testing well forum in our system', 'public', '', '', '2025-04-22 21:07:14', '2025-04-22 21:07:14'),
 (24, 'Nirda_datamanagement', 'this is the forum discussing in correcting the data a=of the industrial researching', 'private', '9,6,1,11', '', '2025-04-22 23:06:10', '2025-04-22 23:06:10'),
-(0, 'NIRDA meetings2', 'testing forum again if is working properlry', 'private', '1,2', '', '2025-04-28 13:43:59', '2025-04-28 13:43:59'),
-(0, 'chech next', 'now now', 'private', '12,11', '', '2025-04-30 00:03:19', '2025-04-30 00:03:19'),
-(0, 'nice', 'welcome', 'private', '6,1', '', '2025-04-30 01:16:53', '2025-04-30 01:16:53');
+(25, 'NIRDA meetings2', 'testing forum again if is working properlry', 'private', '1,2', '', '2025-04-28 13:43:59', '2025-04-28 13:43:59'),
+(26, 'chech next', 'now now', 'private', '12,11', '', '2025-04-30 00:03:19', '2025-04-30 00:03:19'),
+(27, 'nice', 'welcome', 'private', '6,1', '', '2025-04-30 01:16:53', '2025-04-30 01:16:53'),
+(28, 'RUTEMBEZA YVES', 'yyyyyyyyyyyyyy', 'public', '', '', '2025-05-13 10:50:49', '2025-05-13 10:50:49');
 
 -- --------------------------------------------------------
 
@@ -214,7 +217,14 @@ INSERT INTO `forum_replies` (`reply_id`, `topic_id`, `user_id`, `content`, `is_f
 (15, 18, 11, 'hello world!', 0, NULL, '2025-05-12 12:34:39', '2025-05-12 12:34:39'),
 (16, 15, 11, 'hvgvh', 0, NULL, '2025-05-12 13:13:25', '2025-05-12 13:13:25'),
 (17, 27, 11, 'gghh', 0, NULL, '2025-05-12 13:31:57', '2025-05-12 13:31:57'),
-(18, 27, 11, 'kss\\n', 0, NULL, '2025-05-12 13:36:31', '2025-05-12 13:36:31');
+(18, 27, 11, 'kss\\n', 0, NULL, '2025-05-12 13:36:31', '2025-05-12 13:36:31'),
+(19, 27, 11, 'jsksjssk\\n', 0, NULL, '2025-05-13 08:40:10', '2025-05-13 08:40:10'),
+(20, 27, 11, 'hbhbhbh', 0, NULL, '2025-05-13 09:00:58', '2025-05-13 09:00:58'),
+(21, 27, 11, 'khugjbjbnj', 0, NULL, '2025-05-13 09:01:06', '2025-05-13 09:01:06'),
+(22, 17, 11, 'njhjhj\\n', 0, NULL, '2025-05-13 09:01:28', '2025-05-13 09:01:28'),
+(23, 29, 11, 'gfggjbjbjbj\\n', 0, NULL, '2025-05-13 11:00:44', '2025-05-13 11:00:44'),
+(24, 29, 11, 'sjjsjs', 0, NULL, '2025-05-17 18:28:37', '2025-05-17 18:28:37'),
+(25, 13, 11, 'ksks\\n', 0, NULL, '2025-05-17 18:56:10', '2025-05-17 18:56:10');
 
 -- --------------------------------------------------------
 
@@ -223,10 +233,14 @@ INSERT INTO `forum_replies` (`reply_id`, `topic_id`, `user_id`, `content`, `is_f
 --
 
 CREATE TABLE `forum_subscriptions` (
-  `subscription_id` int(11) NOT NULL,
+  `subscription_id` int(11) NOT NULL AUTO_INCREMENT,
   `topic_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`subscription_id`),
+  KEY `idx_topic_user` (`topic_id`, `user_id`),
+  CONSTRAINT `fk_subscription_topic` FOREIGN KEY (`topic_id`) REFERENCES `forum_topics` (`topic_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_subscription_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -237,7 +251,10 @@ INSERT INTO `forum_subscriptions` (`subscription_id`, `topic_id`, `user_id`, `cr
 (0, 7, 11, '2025-04-23 22:32:42'),
 (0, 8, 11, '2025-04-23 22:38:22'),
 (0, 0, 11, '2025-04-25 12:49:43'),
-(0, 0, 12, '2025-04-29 23:39:29');
+(0, 0, 12, '2025-04-29 23:39:29'),
+(0, 17, 11, '2025-05-13 09:01:29'),
+(0, 27, 11, '2025-05-13 10:17:23'),
+(0, 28, 11, '2025-05-13 10:58:55');
 
 -- --------------------------------------------------------
 
@@ -280,7 +297,9 @@ INSERT INTO `forum_topics` (`topic_id`, `category_id`, `user_id`, `title`, `cont
 (16, 0, 12, 'amakuru', '<p>murakoze</p>', 0, 1, '2025-04-30 00:05:45', '2025-04-30 00:05:45'),
 (17, 0, 11, 'nice', '<p>wele</p>', 0, 1, '2025-04-30 01:18:05', '2025-04-30 01:18:05'),
 (18, 0, 11, 'welcome in this general course at nirda', '<ul>\\n<li>thanks for sharing najdn a s</li>\\n<li>jbhugWSHGHjnxasknkankas</li>\\n</ul>', 0, 1, '2025-05-12 08:09:34', '2025-05-12 08:09:34'),
-(27, 0, 11, 'amazing', '<p>welcome&nbsp;</p>\\n<p>hedmnmkksd</p>\\n<p>djkdkd</p>\\n<p>&nbsp;</p>', 0, 1, '2025-05-12 13:13:45', '2025-05-12 13:13:45');
+(27, 0, 11, 'amazing', '<p>welcome&nbsp;</p>\\n<p>hedmnmkksd</p>\\n<p>djkdkd</p>\\n<p>&nbsp;</p>', 0, 1, '2025-05-12 13:13:45', '2025-05-12 13:13:45'),
+(28, 0, 11, 'i need to invite you that i pyshed again', '<ul>\\n<li>this testing <em>conents</em></li>\\n<li><em>h</em></li>\\n</ul>', 0, 1, '2025-05-13 10:58:55', '2025-05-13 10:58:55'),
+(29, 0, 11, 'i need to invite you that i pyshed again', '<p>gshshshhs</p>', 0, 1, '2025-05-13 10:59:19', '2025-05-13 10:59:19');
 
 -- --------------------------------------------------------
 
@@ -334,7 +353,11 @@ INSERT INTO `group_members` (`member_id`, `group_id`, `user_id`, `joined_at`, `i
 (15, 15, 11, '2025-05-04 20:14:18', 1),
 (16, 15, 15, '2025-05-07 00:15:09', 0),
 (22, 14, 12, '2025-05-07 15:04:03', 0),
-(24, 11, 15, '2025-05-08 09:41:51', 0);
+(24, 11, 15, '2025-05-08 09:41:51', 0),
+(26, 16, 11, '2025-05-13 11:28:25', 1),
+(27, 16, 9, '2025-05-13 11:28:25', 0),
+(29, 16, 2, '2025-05-13 11:28:55', 0),
+(30, 13, 14, '2025-05-13 11:37:08', 0);
 
 -- --------------------------------------------------------
 
@@ -391,7 +414,15 @@ INSERT INTO `messages` (`message_id`, `conversation_id`, `group_id`, `sender_id`
 (31, 6, NULL, 15, 'fresh 2', '2025-05-05 13:38:16', 'sent', 0),
 (32, 6, NULL, 15, 'good', '2025-05-05 13:38:22', 'sent', 0),
 (33, NULL, 14, 11, 'kjhgf', '2025-05-07 17:31:42', 'sent', 0),
-(34, NULL, 14, 11, 'bhgv', '2025-05-07 17:31:43', 'sent', 0);
+(34, NULL, 14, 11, 'bhgv', '2025-05-07 17:31:43', 'sent', 0),
+(35, 2, NULL, 11, 'jsjsks', '2025-05-13 08:55:56', 'sent', 0),
+(36, 9, NULL, 11, 'welcpome', '2025-05-13 09:19:38', 'sent', 0),
+(37, NULL, 16, 11, 'uhuhj', '2025-05-13 11:29:06', 'sent', 0),
+(38, NULL, 16, 11, 'mkknk', '2025-05-13 11:29:07', 'sent', 0),
+(39, 10, NULL, 16, 'hello', '2025-05-13 11:34:02', 'sent', 0),
+(40, 10, NULL, 11, 'umezute x', '2025-05-13 11:34:20', 'sent', 0),
+(41, 10, NULL, 16, 'fresh uratangaza iki', '2025-05-13 11:34:41', 'sent', 0),
+(42, 2, NULL, 12, 'jbhg', '2025-05-17 20:58:14', 'sent', 0);
 
 -- --------------------------------------------------------
 
@@ -430,12 +461,14 @@ CREATE TABLE `private_conversations` (
 
 INSERT INTO `private_conversations` (`conversation_id`, `user1_id`, `user2_id`, `created_at`, `last_message_at`) VALUES
 (1, 1, 11, '2025-04-28 20:40:05', '2025-04-30 01:37:03'),
-(2, 11, 12, '2025-04-28 20:44:45', '2025-04-30 07:53:19'),
+(2, 11, 12, '2025-04-28 20:44:45', '2025-05-17 20:58:14'),
 (3, 8, 11, '2025-04-29 23:45:19', NULL),
 (4, 14, 7, '2025-05-05 13:34:07', NULL),
 (5, 15, 13, '2025-05-05 13:36:31', '2025-05-05 13:36:36'),
 (6, 14, 15, '2025-05-05 13:37:11', '2025-05-05 13:38:22'),
-(8, 12, 9, '2025-05-07 00:21:38', NULL);
+(8, 12, 9, '2025-05-07 00:21:38', NULL),
+(9, 11, 9, '2025-05-13 09:19:34', '2025-05-13 09:19:38'),
+(10, 16, 11, '2025-05-13 11:33:59', '2025-05-13 11:34:41');
 
 -- --------------------------------------------------------
 
@@ -471,7 +504,8 @@ INSERT INTO `projects` (`project_id`, `project_name`, `description`, `project_te
 (8, 'Access to Financetyhj', 'ggg', 'Team Collaboration', '2025-05-14', '2025-05-22', 'this and this', 'ggggg', NULL, '2025-05-05 14:04:58'),
 (9, 'nirda collaboration', 'collaboration ends to next week', 'Team Collaboration', '2025-05-01', '2025-05-08', 'certificate', 'today is the day', NULL, '2025-05-06 16:39:10'),
 (10, 'projectTest', 'EJEIDKDK\r\n', '', '2025-05-16', '2025-05-30', 'DKDKD', 'DKKDKD', NULL, '2025-05-08 09:36:17'),
-(11, 'nirdat collaboration forum', 'dfft', 'Team Collaboration', '2025-05-02', '2025-05-10', 'the goals of this project is to provide effectives action to all ', 'ggcv', NULL, '2025-05-08 10:06:12');
+(11, 'nirdat collaboration forum', 'dfft', 'Team Collaboration', '2025-05-02', '2025-05-10', 'the goals of this project is to provide effectives action to all ', 'ggcv', NULL, '2025-05-08 10:06:12'),
+(12, 'nirdat collaboration forum', 'ggggghjj', 'Research Project', '2025-03-28', '2025-05-14', 'the goals of this project is to provide effectives action to all ', 'yyyyhhhh', NULL, '2025-05-13 11:15:06');
 
 -- --------------------------------------------------------
 
@@ -497,23 +531,21 @@ INSERT INTO `project_members` (`member_id`, `project_id`, `user_id`, `role`, `jo
 (17, 4, 6, 'digital_transformation_lead', '2025-05-04 12:32:27'),
 (19, 5, 6, 'digital_transformation_lead', '2025-05-04 14:46:36'),
 (21, 5, 3, 'governance_officer', '2025-05-04 16:28:35'),
-(22, 1, 2, 'digital_transformation_lead', '2025-05-04 16:39:36'),
+(22, 1, 2, 'data_scientist', '2025-05-04 16:39:36'),
 (23, 1, 3, 'department_head', '2025-05-04 17:31:09'),
 (24, 4, 3, 'network_engineer', '2025-05-04 17:36:45'),
-(25, 6, 2, 'knowledge_analyst', '2025-05-04 18:45:51'),
-(26, 7, 2, 'knowledge_analyst', '2025-05-04 18:48:53'),
+(25, 6, 2, 'data_scientist', '2025-05-04 18:45:51'),
+(26, 7, 2, 'data_scientist', '2025-05-04 18:48:53'),
 (27, 2, 15, 'contributor', '2025-05-05 13:42:26'),
-(28, 2, 14, 'software_developer', '2025-05-05 13:42:26'),
 (29, 5, 13, 'software_developer', '2025-05-05 13:54:51'),
-(30, 8, 14, 'database_admin', '2025-05-05 14:04:58'),
-(31, 8, 1, 'systems_admin', '2025-05-05 14:04:58'),
-(32, 8, 2, 'database_admin', '2025-05-05 14:04:58'),
+(32, 8, 2, 'data_scientist', '2025-05-05 14:04:58'),
 (33, 8, 4, 'cio', '2025-05-05 14:04:58'),
 (34, 9, 12, 'media_specialist', '2025-05-06 16:39:10'),
 (35, 10, 12, 'contributor', '2025-05-08 09:36:17'),
 (36, 11, 9, 'contributor', '2025-05-08 10:06:12'),
-(37, 11, 2, 'systems_admin', '2025-05-08 10:06:12'),
-(38, 11, 11, 'contributor', '2025-05-08 10:08:23');
+(37, 11, 2, 'data_scientist', '2025-05-08 10:06:12'),
+(38, 11, 11, 'contributor', '2025-05-08 10:08:23'),
+(39, 12, 4, 'team_lead', '2025-05-13 11:15:06');
 
 -- --------------------------------------------------------
 
@@ -542,9 +574,8 @@ CREATE TABLE `schedule_events` (
 
 INSERT INTO `schedule_events` (`event_id`, `eventTitle`, `startDateTime`, `endingDateTime`, `eventLocation`, `eventDescription`, `attend`, `Recurrence`, `emailReminder`, `appReminder`, `reminderTime`, `isActive`) VALUES
 (4, 'Test Event', '2025-04-25 00:59:34', '2025-04-25 01:59:34', 'Test Location', NULL, NULL, NULL, NULL, NULL, 15, 1),
-(6, 'compainy youth', '2025-04-12 00:49:00', '2025-04-26 00:49:00', 'kigali Rwanda', 'we', 'yvesrutembeza@gmail.com', 'weekly', '1', '0', 60, 1),
-(7, 'event 3', '2025-04-04 01:17:00', '2025-04-05 01:17:00', 'KIGALI RWANDA', 'attendees of event3', 'zayves111@gmail.com', 'daily', '1', '1', 15, 1),
-(8, 'codebase', '2025-04-30 01:26:00', '2025-05-01 01:27:00', 'kigali Rwanda', 'welcome to code base', 'zayves111@gmail.com', 'daily', '1', '0', 15, 1);
+(0, 'NIRDA TEAM MEATING PROJECT', '2025-05-13 12:25:00', '2025-05-16 12:25:00', 'Huye', 'dfsgvbn bvcxz', 'mahofoide@gmail.com', 'daily', '0', '1', 15, 1),
+(0, 'WELCOME2', '2025-05-03 15:07:00', '2025-05-07 15:07:00', 'KIGALI RWANDA', 'WELCOME', 'yvesrutembeza@gmail.com', 'daily', '1', '1', 15, 1);
 
 -- --------------------------------------------------------
 
@@ -567,7 +598,8 @@ CREATE TABLE `starred_conversations` (
 --
 
 INSERT INTO `starred_conversations` (`id`, `user_id`, `conversation_id`, `group_id`, `is_starred`, `starred_at`, `unstarred_at`) VALUES
-(2, 11, 2, NULL, 1, '2025-05-07 00:25:28', NULL);
+(2, 11, 2, NULL, 0, '2025-05-07 00:25:28', '2025-05-13 09:16:56'),
+(3, 11, 2, NULL, 1, '2025-05-13 09:16:58', NULL);
 
 -- --------------------------------------------------------
 
@@ -648,11 +680,12 @@ INSERT INTO `users` (`user_id`, `username`, `email`, `password`, `full_name`, `r
 (8, 'Yves', 'yves.niy@example.com', '$2y$10$NpFJz8zR4nZ0bUZK4OFE1u4VBMv88JUNX6YHcRMF5bUJ2r59mjPiG', 'NIYONSENGA Yves', 1, 'Quality Assurance', '2', 'QA Monitoring', '0788888886', 'Kinyarwanda', 1, '2025-04-09 22:50:00', '2025-04-09 23:15:00'),
 (9, 'Carine', 'carine.k@example.com', '$2y$10$Re0H7xI5OfUOj7sRZ1UdeOTaLS4rF2Uj5u3YZCQN3vly4MPnAMZJq', 'KABANDA Carine', 3, 'Finance and Planning', '2', 'Budget Unit', '0788888887', 'English', 1, '2025-03-22 00:40:00', '2025-03-22 01:10:00'),
 (10, 'Elie', 'elie.m@example.com', '$2y$10$gXoCMUvUM9H1j8jVL3xJHO8uMe98a/1vU8VvZ57qJ6jF2rqL3PzK2', 'MUKIZA Elie', 2, 'Logistics & Operations', '3', 'Fleet Services', '0788888888', 'French', 1, '2025-03-30 02:10:00', '2025-03-30 02:40:00'),
-(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-12 08:07:13'),
+(11, 'rutembeza', 'yvesrutembeza@gmail.com', '$2y$10$0YD.evRN0nXseyxqcHEzn.mMIlG3qmupj3fq8GRKJssp4c9lyBd/.', 'Yves RUTEMBEZA', 3, NULL, NULL, NULL, '0787461999', 'English', 1, '2025-04-22 08:06:40', '2025-05-17 18:28:04'),
 (12, 'christian', 'crutembeza@gmail.com', '$2y$10$j4r3jBG.dkLa4EpIRadoTulQiQkg/6qsI8dyDjRiextONZnEVJnMq', 'RUTEMBEZA CHRISTIAN', 3, NULL, NULL, NULL, '0786436066', 'English', 1, '2025-04-28 13:50:51', '2025-05-07 00:19:48'),
 (13, 'ndoli', 'ndolijeandamascene@gmail.com', '12Damasce12@', 'NDOLI Jean Damascene', 0, NULL, NULL, NULL, NULL, 'English', 1, '2025-05-05 13:28:10', NULL),
 (14, 'ndolijean', 'jdamascene.ndoli@nirda.gov.rw', '$2y$10$H/5oDAJiGj/crJZsJ2oiq.eKv1XZlJd31FsQ3cj1uwbTJBq2GpYA2', 'NDOLI Jean Damascene', 3, NULL, NULL, NULL, '0789312765', 'English', 1, '2025-05-05 13:30:56', '2025-05-05 13:31:06'),
-(15, 'Umutabyi', 'umutambyicompanyltd@gmail.com', '$2y$10$MzIi1E.mpJSUrI1Ydq7/7.2w5fb1kmY0xxQmm6kF5IkHOEn4Nmr3u', 'UMUTABYI', 3, NULL, NULL, NULL, '07884645328', 'English', 1, '2025-05-05 13:36:08', '2025-05-05 13:36:19');
+(15, 'Umutabyi', 'umutambyicompanyltd@gmail.com', '$2y$10$MzIi1E.mpJSUrI1Ydq7/7.2w5fb1kmY0xxQmm6kF5IkHOEn4Nmr3u', 'UMUTABYI', 3, NULL, NULL, NULL, '07884645328', 'English', 1, '2025-05-05 13:36:08', '2025-05-05 13:36:19'),
+(16, 'ndolijeand', 'damasce@gmail.com', '$2y$10$xRu6yXuR1n3.w0N/aiLR6.uimi60l7xc92sQgQNCeM1yW6.1F.deO', 'ndoli', 3, NULL, NULL, NULL, 'ndoli', 'English', 1, '2025-05-13 11:33:08', '2025-05-13 11:33:16');
 
 -- --------------------------------------------------------
 
@@ -719,6 +752,12 @@ ALTER TABLE `chat_groups`
 -- Indexes for table `files`
 --
 ALTER TABLE `files`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `forum_categories`
+--
+ALTER TABLE `forum_categories`
   ADD PRIMARY KEY (`id`);
 
 --
@@ -838,7 +877,7 @@ ALTER TABLE `activities`
 -- AUTO_INCREMENT for table `attendees`
 --
 ALTER TABLE `attendees`
-  MODIFY `attendee_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `attendee_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `blocked_users`
@@ -850,7 +889,7 @@ ALTER TABLE `blocked_users`
 -- AUTO_INCREMENT for table `chat_groups`
 --
 ALTER TABLE `chat_groups`
-  MODIFY `group_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `group_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `files`
@@ -859,16 +898,22 @@ ALTER TABLE `files`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
 
 --
+-- AUTO_INCREMENT for table `forum_categories`
+--
+ALTER TABLE `forum_categories`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+
+--
 -- AUTO_INCREMENT for table `forum_replies`
 --
 ALTER TABLE `forum_replies`
-  MODIFY `reply_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `reply_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `forum_topics`
 --
 ALTER TABLE `forum_topics`
-  MODIFY `topic_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `topic_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `group_invitations`
@@ -880,13 +925,13 @@ ALTER TABLE `group_invitations`
 -- AUTO_INCREMENT for table `group_members`
 --
 ALTER TABLE `group_members`
-  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `messages`
 --
 ALTER TABLE `messages`
-  MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT for table `message_attachments`
@@ -898,25 +943,25 @@ ALTER TABLE `message_attachments`
 -- AUTO_INCREMENT for table `private_conversations`
 --
 ALTER TABLE `private_conversations`
-  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `conversation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `project_members`
 --
 ALTER TABLE `project_members`
-  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `member_id` int(12) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
 
 --
 -- AUTO_INCREMENT for table `starred_conversations`
 --
 ALTER TABLE `starred_conversations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tasks`
@@ -928,7 +973,7 @@ ALTER TABLE `tasks`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `user_profiles`
