@@ -132,6 +132,9 @@ try {
                 case 'delete_category':
                     $response = deleteCategory($input);
                     break;
+                case 'toggle_pin':
+                    $response = togglePin($input);
+                    break;
                 default:
                     http_response_code(400);
                     $response = ['error' => 'Invalid action'];
@@ -653,17 +656,31 @@ function isContentOwner($user_id, $data) {
 function togglePin($data) {
     global $conn;
     
-    $topic_id = intval($data['topic_id']);
-    $pinned = $data['pinned'] ? 1 : 0;
-    
-    $stmt = $conn->prepare("UPDATE forum_topics SET is_pinned = ?, updated_at = NOW() WHERE topic_id = ?");
-    $stmt->bind_param("ii", $pinned, $topic_id);
-    
-    if (!$stmt->execute()) {
-        throw new Exception('Failed to update pin status');
+    if (!isset($data['topic_id'])) {
+        throw new Exception('Topic ID is required');
     }
     
-    return ['success' => true, 'message' => 'Pin status updated successfully'];
+    $topic_id = intval($data['topic_id']);
+    $pinned = isset($data['pinned']) ? (bool)$data['pinned'] : false;
+    
+    // Check if user has permission
+    if (!hasModerationPrivileges($_SESSION['user_id'])) {
+        throw new Exception('You do not have permission to pin/unpin topics');
+    }
+    
+    $stmt = $conn->prepare("UPDATE forum_topics SET is_pinned = ?, updated_at = NOW() WHERE topic_id = ?");
+    $pinned_val = $pinned ? 1 : 0;
+    $stmt->bind_param("ii", $pinned_val, $topic_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to update pin status: ' . $stmt->error);
+    }
+    
+    return [
+        'success' => true,
+        'message' => 'Pin status updated successfully',
+        'is_pinned' => $pinned
+    ];
 }
 
 function toggleActive($data) {
@@ -691,65 +708,71 @@ function hasModerationPrivileges($user_id) {
     $result = $stmt->get_result();
     $user = $result->fetch_assoc();
     
-    // Assuming roles 1 and 2 are admin/moderator
-    return in_array($user['role_id'], [1, 2]);
+    // Include role 3 in moderation privileges
+    return in_array($user['role_id'], [1, 2, 3]);
 }
 
 function subscribeToTopic($data) {
     global $conn;
     
-    try {
-        $topic_id = intval($data['topic_id']);
-        $user_id = isset($data['user_id']) ? intval($data['user_id']) : $_SESSION['user_id'];
-        
-        // Validate topic exists
-        $check = $conn->prepare("SELECT 1 FROM forum_topics WHERE topic_id = ?");
-        $check->bind_param("i", $topic_id);
-        $check->execute();
-        if ($check->get_result()->num_rows === 0) {
-            throw new Exception('Topic not found');
-        }
-        
-        // Check if already subscribed
-        $check = $conn->prepare("SELECT subscription_id FROM forum_subscriptions WHERE topic_id = ? AND user_id = ?");
-        $check->bind_param("ii", $topic_id, $user_id);
-        $check->execute();
-        
-        if ($check->get_result()->num_rows > 0) {
-            return ['success' => true, 'message' => 'Already subscribed to this topic'];
-        }
-        
-        // Add subscription - note we don't specify subscription_id as it's auto-increment
-        $stmt = $conn->prepare("INSERT INTO forum_subscriptions (topic_id, user_id) VALUES (?, ?)");
-        $stmt->bind_param("ii", $topic_id, $user_id);
-        
-        if (!$stmt->execute()) {
-            error_log("Failed to subscribe to topic: " . $conn->error);
-            throw new Exception('Failed to subscribe to topic: ' . $conn->error);
-        }
-        
-        return ['success' => true, 'message' => 'Subscribed to topic successfully'];
-        
-    } catch (Exception $e) {
-        error_log("Error in subscribeToTopic: " . $e->getMessage());
-        throw $e;
+    if (!isset($data['topic_id']) || !isset($data['user_id'])) {
+        throw new Exception('Topic ID and User ID are required');
     }
+    
+    $topic_id = intval($data['topic_id']);
+    $user_id = intval($data['user_id']);
+    
+    // Check if already subscribed
+    $check_stmt = $conn->prepare("SELECT subscription_id FROM forum_subscriptions WHERE topic_id = ? AND user_id = ?");
+    $check_stmt->bind_param("ii", $topic_id, $user_id);
+    $check_stmt->execute();
+    $result = $check_stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        throw new Exception('You are already subscribed to this topic');
+    }
+    
+    // Create subscription
+    $stmt = $conn->prepare("INSERT INTO forum_subscriptions (topic_id, user_id, created_at) VALUES (?, ?, NOW())");
+    $stmt->bind_param("ii", $topic_id, $user_id);
+    
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to subscribe: ' . $stmt->error);
+    }
+    
+    return [
+        'success' => true,
+        'message' => 'Successfully subscribed to topic',
+        'subscription_id' => $stmt->insert_id
+    ];
 }
 
 function unsubscribeFromTopic($data) {
     global $conn;
     
-    $topic_id = intval($data['topic_id']);
-    $user_id = isset($data['user_id']) ? intval($data['user_id']) : $_SESSION['user_id'];
+    if (!isset($data['topic_id']) || !isset($data['user_id'])) {
+        throw new Exception('Topic ID and User ID are required');
+    }
     
+    $topic_id = intval($data['topic_id']);
+    $user_id = intval($data['user_id']);
+    
+    // Delete subscription
     $stmt = $conn->prepare("DELETE FROM forum_subscriptions WHERE topic_id = ? AND user_id = ?");
     $stmt->bind_param("ii", $topic_id, $user_id);
     
     if (!$stmt->execute()) {
-        throw new Exception('Failed to unsubscribe from topic');
+        throw new Exception('Failed to unsubscribe: ' . $stmt->error);
     }
     
-    return ['success' => true, 'message' => 'Unsubscribed successfully'];
+    if ($stmt->affected_rows === 0) {
+        throw new Exception('You are not subscribed to this topic');
+    }
+    
+    return [
+        'success' => true,
+        'message' => 'Successfully unsubscribed from topic'
+    ];
 }
 
 function getForumStats() {
@@ -833,10 +856,10 @@ function resolveFlag($data) {
     try {
         $conn->begin_transaction();
         
-        // First verify the reply exists
-        $check_stmt = $conn->prepare("SELECT r.reply_id, r.user_id, r.content, r.topic_id 
+        // First verify the reply exists and is flagged
+        $check_stmt = $conn->prepare("SELECT r.reply_id, r.user_id, r.content, r.topic_id, r.is_flagged 
                                     FROM forum_replies r 
-                                    WHERE r.reply_id = ? AND r.is_flagged = 1");
+                                    WHERE r.reply_id = ?");
         $check_stmt->bind_param("i", $reply_id);
         if (!$check_stmt->execute()) {
             throw new Exception('Failed to verify reply: ' . $check_stmt->error);
@@ -844,10 +867,13 @@ function resolveFlag($data) {
         
         $result = $check_stmt->get_result();
         if ($result->num_rows === 0) {
-            throw new Exception('Reply not found or not flagged');
+            throw new Exception('Reply not found');
         }
         
         $reply_info = $result->fetch_assoc();
+        if (!$reply_info['is_flagged']) {
+            throw new Exception('Reply is not flagged');
+        }
         
         switch ($resolution) {
             case 'keep':

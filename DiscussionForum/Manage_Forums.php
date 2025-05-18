@@ -640,10 +640,8 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                 <div class="topic-list-header">
                     <h2 style="padding-left: 200px;">Manage Forums</h2>
                     <div class="header-controls">
-                        ${(currentUserRole === 1 || currentUserRole === 2) ? 
-                            `<button class="btn btn-primary" onclick="showReviewReportsModal(event)" style="margin-right: 10px;">
-                                <i class="fas fa-shield-alt"></i> Admin Panel
-                            </button>` : ''}
+                        
+                     
                         <button class="btn btn-primary" id="createTopicBtn">Create New Topic</button>
                     </div>
                     <div class="search-filters" style="margin-bottom: 20px;">
@@ -796,13 +794,15 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
 
         // Document Ready Function
         document.addEventListener('DOMContentLoaded', function() {
-            // Get current user role from server
+            // Get current user role from server and update UI accordingly
             fetch(`${API_BASE_URL}?action=get_topics`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.current_user_role) {
                         currentUserRole = data.current_user_role;
                         console.log('Updated currentUserRole:', currentUserRole);
+                        // Update UI based on role
+                        updateUIBasedOnRole();
                     }
                 })
                 .catch(error => console.error('Error getting user role:', error));
@@ -825,7 +825,7 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
             loadTopics();
             
             // Show moderation controls if user is admin/moderator
-            if (currentUserRole === 1 || currentUserRole === 2) {
+            if (currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3) {
                 document.getElementById('moderationControls').style.display = 'block';
             }
             
@@ -844,6 +844,18 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
             document.getElementById('dateFilter').addEventListener('change', applyFilters);
             document.getElementById('userFilter').addEventListener('change', applyFilters);
         });
+
+        // function updateUIBasedOnRole() {
+        //     const headerControls = document.querySelector('.header-controls');
+        //     if (headerControls) {
+        //         if (currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3) {
+        //             const adminButton = `<button class="btn btn-primary" onclick="showReviewReportsModal(event)" style="margin-right: 10px;">
+        //                 <i class="fas fa-flag"></i> Review Reports
+        //             </button>`;
+        //             headerControls.insertAdjacentHTML('afterbegin', adminButton);
+        //         }
+        //     }
+        // }
 
         /**
          * Main application initialization
@@ -956,12 +968,6 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                         throw new Error(data.error);
                     }
 
-                    // Update current user role if provided
-                    if (data.current_user_role) {
-                        currentUserRole = data.current_user_role;
-                        console.log('Updated currentUserRole:', currentUserRole);
-                    }
-
                     const topicList = document.getElementById('topicList');
                     topicList.innerHTML = '';
                     
@@ -970,25 +976,7 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                         return;
                     }
                     
-                    totalPages = Math.ceil(data.total_count / data.per_page);
-                    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
-                    document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage === totalPages;
-                    
                     data.topics.forEach(topic => {
-                        console.log('Processing topic:', topic.title);
-                        console.log('Author ID:', topic.author.id);
-                        console.log('Current User ID:', currentUserId);
-                        console.log('Current User Role:', currentUserRole);
-                        
-                        // Check if user can edit/delete
-                        const canEdit = topic.can_edit || currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3;
-                        // Check if user can pin/unpin
-                        const canPin = topic.can_pin || currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3;
-                        
-                        console.log('Can Edit:', canEdit);
-                        console.log('Can Pin:', canPin);
-                        
                         const topicElement = document.createElement('div');
                         topicElement.className = `topic-item ${topic.active ? '' : 'deactivated'}`;
                         topicElement.innerHTML = `
@@ -999,17 +987,17 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                             <div class="topic-meta">Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}</div>
                             <div class="topic-stats">
                                 <span>${topic.reply_count} replies</span>
-                                <button class="btn ${topic.is_subscribed ? 'btn-danger' : 'btn-primary'} btn-sm subscription-btn" 
+                                <button class="btn ${topic.is_subscribed ? 'btn-danger' : 'btn-primary'} btn-sm" 
                                         onclick="${topic.is_subscribed ? 'unsubscribeFromTopic' : 'subscribeToTopic'}(${topic.id})">
                                     ${topic.is_subscribed ? 'Unsubscribe' : 'Subscribe'}
                                 </button>
                             </div>
                             <div class="mod-controls">
                                 <button class="mod-btn" onclick="viewTopic(${topic.id})">View</button>
-                                ${canEdit ? 
+                                ${topic.can_edit ? 
                                     `<button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
                                      <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>` : ''}
-                                ${canPin ? 
+                                ${(currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3) ? 
                                     `<button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
                                         ${topic.pinned ? 'Unpin' : 'Pin'}
                                     </button>
@@ -1022,14 +1010,11 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                                     </div>` : ''}
                             </div>
                         `;
-                        
                         topicList.appendChild(topicElement);
                     });
                 })
                 .catch(error => {
                     console.error('Error loading topics:', error);
-                    const topicList = document.getElementById('topicList');
-                    topicList.innerHTML = `<p class="error">Error loading topics: ${error.message}</p>`;
                     showAlert('Failed to load topics. Please try again.', 'error');
                 });
         }
@@ -1148,6 +1133,11 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
          * Subscribe to a topic
          */
         function subscribeToTopic(topicId) {
+            if (!currentUserId) {
+                alert('Please log in to subscribe to topics');
+                return;
+            }
+
             fetch(API_BASE_URL, {
                 method: 'POST',
                 headers: {
@@ -1162,17 +1152,23 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert(data.error);
+                    showAlert(data.error, 'error');
                     return;
                 }
                 
-                currentTopicSubscribed = true;
-                updateSubscriptionButton();
-                alert('You have subscribed to this topic');
+                showAlert('Successfully subscribed to topic', 'success');
+                // Update the subscription button
+                const subscriptionBtn = document.querySelector(`button[onclick="subscribeToTopic(${topicId})"]`);
+                if (subscriptionBtn) {
+                    subscriptionBtn.innerHTML = 'Unsubscribe';
+                    subscriptionBtn.onclick = () => unsubscribeFromTopic(topicId);
+                    subscriptionBtn.classList.remove('btn-primary');
+                    subscriptionBtn.classList.add('btn-danger');
+                }
             })
             .catch(error => {
                 console.error('Error subscribing to topic:', error);
-                alert('Failed to subscribe');
+                showAlert('Failed to subscribe to topic', 'error');
             });
         }
 
@@ -1180,6 +1176,11 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
          * Unsubscribe from a topic
          */
         function unsubscribeFromTopic(topicId) {
+            if (!currentUserId) {
+                alert('Please log in to manage subscriptions');
+                return;
+            }
+
             fetch(API_BASE_URL, {
                 method: 'POST',
                 headers: {
@@ -1194,17 +1195,23 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert(data.error);
+                    showAlert(data.error, 'error');
                     return;
                 }
                 
-                currentTopicSubscribed = false;
-                updateSubscriptionButton();
-                alert('You have unsubscribed from this topic');
+                showAlert('Successfully unsubscribed from topic', 'success');
+                // Update the subscription button
+                const subscriptionBtn = document.querySelector(`button[onclick="unsubscribeFromTopic(${topicId})"]`);
+                if (subscriptionBtn) {
+                    subscriptionBtn.innerHTML = 'Subscribe';
+                    subscriptionBtn.onclick = () => subscribeToTopic(topicId);
+                    subscriptionBtn.classList.remove('btn-danger');
+                    subscriptionBtn.classList.add('btn-primary');
+                }
             })
             .catch(error => {
                 console.error('Error unsubscribing from topic:', error);
-                alert('Failed to unsubscribe');
+                showAlert('Failed to unsubscribe from topic', 'error');
             });
         }
 
@@ -2016,7 +2023,7 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                             <div class="topic-meta">Posted by ${topic.author.name} in ${topic.category.name} on ${new Date(topic.created_at).toLocaleDateString()}</div>
                             <div class="topic-stats">
                                 <span>${topic.reply_count} replies</span>
-                                <button class="btn ${topic.is_subscribed ? 'btn-danger' : 'btn-primary'} btn-sm subscription-btn" 
+                                <button class="btn ${topic.is_subscribed ? 'btn-danger' : 'btn-primary'} btn-sm" 
                                         onclick="${topic.is_subscribed ? 'unsubscribeFromTopic' : 'subscribeToTopic'}(${topic.id})">
                                     ${topic.is_subscribed ? 'Unsubscribe' : 'Subscribe'}
                                 </button>
@@ -2026,7 +2033,7 @@ require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
                                 ${topic.can_edit ? 
                                     `<button class="mod-btn" onclick="editTopic(${topic.id})">Edit</button>
                                      <button class="mod-btn" onclick="confirmDelete(${topic.id}, true)">Delete</button>` : ''}
-                                ${(currentUserRole === 1 || currentUserRole === 2) ? 
+                                ${(currentUserRole === 1 || currentUserRole === 2 || currentUserRole === 3) ? 
                                     `<button class="mod-btn" onclick="togglePin(${topic.id}, ${topic.pinned})">
                                         ${topic.pinned ? 'Unpin' : 'Pin'}
                                     </button>
