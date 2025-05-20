@@ -1,19 +1,19 @@
 <?php return array(
     'root' => array(
-        'name' => 'nirda/kms-schedule-event',
+        'name' => '__root__',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '2e8fa0be911975a910c513ac912612296e46d349',
+        'reference' => 'fb3de3603531a7b453cacd46d399d300716b81fa',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        'nirda/kms-schedule-event' => array(
+        '__root__' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '2e8fa0be911975a910c513ac912612296e46d349',
+            'reference' => 'fb3de3603531a7b453cacd46d399d300716b81fa',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

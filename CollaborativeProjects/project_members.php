@@ -448,7 +448,7 @@ if (isset($_SESSION['error'])) {
         
         <div class="header">
             <h1 class="project-title"><?= htmlspecialchars($project['project_name']) ?> - Team Management</h1>
-            <p>Project ID: <?= $project['project_id'] ?></p>
+            <!-- <p>Project ID: <?= $project['project_id'] ?></p> -->
             <button class="btn btn-primary"><a href="../CollaborativeProjects/invitemember.php" style="text-decoration: none; color: white;">Invite Members</a></button>
         </div>
         
@@ -459,12 +459,7 @@ if (isset($_SESSION['error'])) {
                 <label for="selectAll">Select all</label>
             </div>
             <span id="selectedCount">0 selected</span>
-            <select class="form-control" style="width: 150px;" id="bulkRoleChange">
-                <option value="">Change role to...</option>
-                <option value="manager">Manager</option>
-                <option value="contributor">Contributor</option>
-                <option value="viewer">Viewer</option>
-            </select>
+           
             <button class="btn btn-danger" onclick="removeSelectedMembers()">Remove</button>
             <button class="btn btn-secondary" onclick="cancelBulkActions()">Cancel</button>
         </div>
@@ -504,81 +499,19 @@ if (isset($_SESSION['error'])) {
         <!-- Role Edit Form -->
         <form method="post" style="display: inline;">
             <input type="hidden" name="member_id" value="<?= $member['user_id'] ?>">
-            <select name="new_role" class="role-dropdown">
-                <!-- Leadership & Management -->
-                <option value="executive_director" <?= $member['role'] == 'executive_director' ? 'selected' : '' ?>>Executive Director</option>
-                <option value="deputy_director" <?= $member['role'] == 'deputy_director' ? 'selected' : '' ?>>Deputy Director</option>
-                <option value="department_head" <?= $member['role'] == 'department_head' ? 'selected' : '' ?>>Department Head</option>
-                <option value="division_chief" <?= $member['role'] == 'division_chief' ? 'selected' : '' ?>>Division Chief</option>
-                <option value="program_manager" <?= $member['role'] == 'program_manager' ? 'selected' : '' ?>>Program Manager</option>
-                <option value="project_manager" <?= $member['role'] == 'project_manager' ? 'selected' : '' ?>>Project Manager</option>
-                <option value="team_lead" <?= $member['role'] == 'team_lead' ? 'selected' : '' ?>>Team Lead</option>
-                <option value="unit_supervisor" <?= $member['role'] == 'unit_supervisor' ? 'selected' : '' ?>>Unit Supervisor</option>
-                <option value="regional_coordinator" <?= $member['role'] == 'regional_coordinator' ? 'selected' : '' ?>>Regional Coordinator</option>
-                <option value="strategic_advisor" <?= $member['role'] == 'strategic_advisor' ? 'selected' : '' ?>>Strategic Advisor</option>
-                <option value="governance_officer" <?= $member['role'] == 'governance_officer' ? 'selected' : '' ?>>Governance Officer</option>
-                <option value="operations_manager" <?= $member['role'] == 'operations_manager' ? 'selected' : '' ?>>Operations Manager</option>
-                
-                <!-- Technical & Research -->
-                <option value="chief_scientist" <?= $member['role'] == 'chief_scientist' ? 'selected' : '' ?>>Chief Scientist</option>
-                <option value="senior_researcher" <?= $member['role'] == 'senior_researcher' ? 'selected' : '' ?>>Senior Researcher</option>
-                <option value="research_fellow" <?= $member['role'] == 'research_fellow' ? 'selected' : '' ?>>Research Fellow</option>
-                <option value="data_scientist" <?= $member['role'] == 'data_scientist' ? 'selected' : '' ?>>Data Scientist</option>
-                <option value="statistician" <?= $member['role'] == 'statistician' ? 'selected' : '' ?>>Statistician</option>
-                <option value="technical_advisor" <?= $member['role'] == 'technical_advisor' ? 'selected' : '' ?>>Technical Advisor</option>
-                <option value="innovation_specialist" <?= $member['role'] == 'innovation_specialist' ? 'selected' : '' ?>>Innovation Specialist</option>
-                <option value="lab_manager" <?= $member['role'] == 'lab_manager' ? 'selected' : '' ?>>Lab Manager</option>
-                <option value="field_researcher" <?= $member['role'] == 'field_researcher' ? 'selected' : '' ?>>Field Researcher</option>
-                <option value="evaluation_specialist" <?= $member['role'] == 'evaluation_specialist' ? 'selected' : '' ?>>Evaluation Specialist</option>
-                <option value="technology_architect" <?= $member['role'] == 'technology_architect' ? 'selected' : '' ?>>Technology Architect</option>
-                <option value="systems_analyst" <?= $member['role'] == 'systems_analyst' ? 'selected' : '' ?>>Systems Analyst</option>
-                <option value="ai_specialist" <?= $member['role'] == 'ai_specialist' ? 'selected' : '' ?>>AI Specialist</option>
-                <option value="gis_specialist" <?= $member['role'] == 'gis_specialist' ? 'selected' : '' ?>>GIS Specialist</option>
-                <option value="technical_writer" <?= $member['role'] == 'technical_writer' ? 'selected' : '' ?>>Technical Writer</option>
-                
-                <!-- Administration & Support -->
-                <option value="admin_officer" <?= $member['role'] == 'admin_officer' ? 'selected' : '' ?>>Admin Officer</option>
-                <option value="hr_manager" <?= $member['role'] == 'hr_manager' ? 'selected' : '' ?>>HR Manager</option>
-                <option value="finance_officer" <?= $member['role'] == 'finance_officer' ? 'selected' : '' ?>>Finance Officer</option>
-                <option value="procurement_specialist" <?= $member['role'] == 'procurement_specialist' ? 'selected' : '' ?>>Procurement Specialist</option>
-                <option value="logistics_coordinator" <?= $member['role'] == 'logistics_coordinator' ? 'selected' : '' ?>>Logistics Coordinator</option>
-                <option value="facilities_manager" <?= $member['role'] == 'facilities_manager' ? 'selected' : '' ?>>Facilities Manager</option>
-                <option value="executive_assistant" <?= $member['role'] == 'executive_assistant' ? 'selected' : '' ?>>Executive Assistant</option>
-                <option value="records_manager" <?= $member['role'] == 'records_manager' ? 'selected' : '' ?>>Records Manager</option>
-                <option value="legal_advisor" <?= $member['role'] == 'legal_advisor' ? 'selected' : '' ?>>Legal Advisor</option>
-                <option value="compliance_officer" <?= $member['role'] == 'compliance_officer' ? 'selected' : '' ?>>Compliance Officer</option>
-                <option value="internal_auditor" <?= $member['role'] == 'internal_auditor' ? 'selected' : '' ?>>Internal Auditor</option>
-                <option value="security_officer" <?= $member['role'] == 'security_officer' ? 'selected' : '' ?>>Security Officer</option>
-                
-                <!-- Knowledge Management -->
-                <option value="km_strategist" <?= $member['role'] == 'km_strategist' ? 'selected' : '' ?>>KM Strategist</option>
-                <option value="knowledge_curator" <?= $member['role'] == 'knowledge_curator' ? 'selected' : '' ?>>Knowledge Curator</option>
-                <option value="information_specialist" <?= $member['role'] == 'information_specialist' ? 'selected' : '' ?>>Information Specialist</option>
-                <option value="content_manager" <?= $member['role'] == 'content_manager' ? 'selected' : '' ?>>Content Manager</option>
-                <option value="documentation_specialist" <?= $member['role'] == 'documentation_specialist' ? 'selected' : '' ?>>Documentation Specialist</option>
-                <option value="taxonomy_expert" <?= $member['role'] == 'taxonomy_expert' ? 'selected' : '' ?>>Taxonomy Expert</option>
-                <option value="metadata_specialist" <?= $member['role'] == 'metadata_specialist' ? 'selected' : '' ?>>Metadata Specialist</option>
-                <option value="community_manager" <?= $member['role'] == 'community_manager' ? 'selected' : '' ?>>Community Manager</option>
-                <option value="learning_developer" <?= $member['role'] == 'learning_developer' ? 'selected' : '' ?>>Learning Developer</option>
-                <option value="knowledge_analyst" <?= $member['role'] == 'knowledge_analyst' ? 'selected' : '' ?>>Knowledge Analyst</option>
-                
-                <!-- ICT & Digital -->
-                <option value="cio" <?= $member['role'] == 'cio' ? 'selected' : '' ?>>Chief Information Officer</option>
-                <option value="systems_admin" <?= $member['role'] == 'systems_admin' ? 'selected' : '' ?>>Systems Administrator</option>
-                <option value="database_admin" <?= $member['role'] == 'database_admin' ? 'selected' : '' ?>>Database Administrator</option>
-                <option value="network_engineer" <?= $member['role'] == 'network_engineer' ? 'selected' : '' ?>>Network Engineer</option>
-                <option value="software_developer" <?= $member['role'] == 'software_developer' ? 'selected' : '' ?>>Software Developer</option>
-                <option value="webmaster" <?= $member['role'] == 'webmaster' ? 'selected' : '' ?>>Webmaster</option>
-                <option value="cybersecurity_specialist" <?= $member['role'] == 'cybersecurity_specialist' ? 'selected' : '' ?>>Cybersecurity Specialist</option>
-                <option value="digital_transformation_lead" <?= $member['role'] == 'digital_transformation_lead' ? 'selected' : '' ?>>Digital Transformation Lead</option>
-                
-                <!-- Communication & Outreach -->
-                <option value="communications_director" <?= $member['role'] == 'communications_director' ? 'selected' : '' ?>>Communications Director</option>
-                <option value="public_relations_officer" <?= $member['role'] == 'public_relations_officer' ? 'selected' : '' ?>>Public Relations Officer</option>
-                <option value="media_specialist" <?= $member['role'] == 'media_specialist' ? 'selected' : '' ?>>Media Specialist</option>
-                <option value="graphic_designer" <?= $member['role'] == 'graphic_designer' ? 'selected' : '' ?>>Graphic Designer</option>
-                <option value="multimedia_producer" <?= $member['role'] == 'multimedia_producer' ? 'selected' : '' ?>>Multimedia Producer</option>
-            </select>
+            <select id="roleSelect" class="member-role" name="new_role">
+    <?php
+    // Assuming you have a database connection
+    $query = "SELECT role_id, role_name FROM roles ORDER BY role_name";
+    $result = mysqli_query($connection, $query);
+    
+    while ($row = mysqli_fetch_assoc($result)) {
+        $selected = ($row['role_id'] == 'contributor') ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($row['role_id']) . '"' . $selected . '>' 
+             . htmlspecialchars($row['role_name']) . '</option>';
+    }
+    ?>
+</select>
             <button type="submit" name="update_role" class="action-btn">Save</button>
             <a href="?cancel=1" class="action-btn">Cancel</a>
         </form>

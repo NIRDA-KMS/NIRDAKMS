@@ -1,5 +1,5 @@
 <?php
-include 'db_connection.php';
+include '../NIRDAKMS/SchedureEvent/connect.php';
 include "header.php";
 
 // Debug: Check if database connection is successful

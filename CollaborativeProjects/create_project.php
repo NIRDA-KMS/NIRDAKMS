@@ -461,7 +461,7 @@ select:focus {
                 
                 <div class="form-group">
                     <label for="projectDescription">Description</label>
-                    <textarea id="projectDescription" name="projectDescription"></textarea>
+                    <textarea id="projectDescription"name="projectDescription" maxlength="10000"></textarea>
                 </div>
                 
                 <div class="form-row" style="display: flex; gap: 20px;">
@@ -519,83 +519,18 @@ select:focus {
                             }
                             ?>
                         </select>
-                        <select id="roleSelect" class="member-role">
-    <!-- Leadership & Management -->
-    <option value="executive_director">Executive Director</option>
-    <option value="deputy_director">Deputy Director</option>
-    <option value="department_head">Department Head</option>
-    <option value="division_chief">Division Chief</option>
-    <option value="program_manager">Program Manager</option>
-    <option value="project_manager">Project Manager</option>
-    <option value="team_lead">Team Lead</option>
-    <option value="unit_supervisor">Unit Supervisor</option>
-    <option value="regional_coordinator">Regional Coordinator</option>
-    <option value="strategic_advisor">Strategic Advisor</option>
-    <option value="governance_officer">Governance Officer</option>
-    <option value="operations_manager">Operations Manager</option>
+                        <select id="roleSelect" class="member-role" name="new_role">
+    <?php
+    // Assuming you have a database connection
+    $query = "SELECT role_id, role_name FROM roles ORDER BY role_name";
+    $result = mysqli_query($connection, $query);
     
-    <!-- Technical & Research -->
-    <option value="chief_scientist">Chief Scientist</option>
-    <option value="senior_researcher">Senior Researcher</option>
-    <option value="research_fellow">Research Fellow</option>
-    <option value="data_scientist">Data Scientist</option>
-    <option value="statistician">Statistician</option>
-    <option value="technical_advisor">Technical Advisor</option>
-    <option value="innovation_specialist">Innovation Specialist</option>
-    <option value="lab_manager">Lab Manager</option>
-    <option value="field_researcher">Field Researcher</option>
-    <option value="evaluation_specialist">Evaluation Specialist</option>
-    <option value="technology_architect">Technology Architect</option>
-    <option value="systems_analyst">Systems Analyst</option>
-    <option value="ai_specialist">AI Specialist</option>
-    <option value="gis_specialist">GIS Specialist</option>
-    <option value="technical_writer">Technical Writer</option>
-    
-    <!-- Administration & Support -->
-    <option value="admin_officer">Admin Officer</option>
-    <option value="hr_manager">HR Manager</option>
-    <option value="finance_officer">Finance Officer</option>
-    <option value="procurement_specialist">Procurement Specialist</option>
-    <option value="logistics_coordinator">Logistics Coordinator</option>
-    <option value="facilities_manager">Facilities Manager</option>
-    <option value="executive_assistant">Executive Assistant</option>
-    <option value="records_manager">Records Manager</option>
-    <option value="legal_advisor">Legal Advisor</option>
-    <option value="compliance_officer">Compliance Officer</option>
-    <option value="internal_auditor">Internal Auditor</option>
-    <option value="security_officer">Security Officer</option>
-    
-    <!-- Knowledge Management -->
-    <option value="km_strategist">KM Strategist</option>
-    <option value="knowledge_curator">Knowledge Curator</option>
-    <option value="information_specialist">Information Specialist</option>
-    <option value="content_manager">Content Manager</option>
-    <option value="documentation_specialist">Documentation Specialist</option>
-    <option value="taxonomy_expert">Taxonomy Expert</option>
-    <option value="metadata_specialist">Metadata Specialist</option>
-    <option value="community_manager">Community Manager</option>
-    <option value="learning_developer">Learning Developer</option>
-    <option value="knowledge_analyst">Knowledge Analyst</option>
-    
-    <!-- ICT & Digital -->
-    <option value="cio">Chief Information Officer</option>
-    <option value="systems_admin">Systems Administrator</option>
-    <option value="database_admin">Database Administrator</option>
-    <option value="network_engineer">Network Engineer</option>
-    <option value="software_developer">Software Developer</option>
-    <option value="webmaster">Webmaster</option>
-    <option value="cybersecurity_specialist">Cybersecurity Specialist</option>
-    <option value="digital_transformation_lead">Digital Transformation Lead</option>
-    
-    <!-- Communication & Outreach -->
-    <option value="communications_director">Communications Director</option>
-    <option value="public_relations_officer">Public Relations Officer</option>
-    <option value="media_specialist">Media Specialist</option>
-    <option value="graphic_designer">Graphic Designer</option>
-    <option value="multimedia_producer">Multimedia Producer</option>
-    
-    <!-- Default selected -->
-    <option value="contributor" selected>Contributor</option>
+    while ($row = mysqli_fetch_assoc($result)) {
+        $selected = ($row['role_id'] == 'contributor') ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($row['role_id']) . '"' . $selected . '>' 
+             . htmlspecialchars($row['role_name']) . '</option>';
+    }
+    ?>
 </select>
                         <button type="button" class="btn btn-accent" id="addMemberBtn"><i class="fas fa-plus"></i> Add</button>
                     </div>
