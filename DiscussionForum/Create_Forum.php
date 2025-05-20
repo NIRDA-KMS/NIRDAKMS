@@ -1,5 +1,6 @@
 <?php
 // Start session and include header
+include('../Internees_task/header.php');
 
 // Database connection
 require_once('../SchedureEvent/connect.php');
@@ -14,8 +15,8 @@ $success = '';
 $users = [];
 $groups = [];
 
-// Check if user is logged in (add your own authentication logic)
-require_once __DIR__ . '/../Internees_task/auth/auth_check.php'; 
+// // Check if user is logged in (add your own authentication logic)
+// require_once __DIR__ . '/../Internees_task/auth/auth_check.php'; 
 
 
 // Get users and groups for access control
@@ -137,7 +138,7 @@ function validateUserIds($conn, $user_ids) {
         
         .container {
             max-width: 800px;
-            margin: 100px auto;
+            margin: 30px auto;
             background: white;
             padding: 30px;
             padding-top: 50px;
@@ -148,6 +149,7 @@ function validateUserIds($conn, $user_ids) {
         h1 {
             margin-bottom: 20px;
             font-size: 24px;
+            color: #2c3e50;
         }
         
         .form-group {
@@ -220,6 +222,7 @@ function validateUserIds($conn, $user_ids) {
             cursor: pointer;
             font-weight: 600;
             margin-right: 10px;
+            transition: background-color 0.3s;
         }
         
         .btn-primary {
@@ -227,9 +230,17 @@ function validateUserIds($conn, $user_ids) {
             color: white;
         }
         
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
         .btn-secondary {
             background: #95a5a6;
             color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
         }
         
         .preview-section {
@@ -260,6 +271,7 @@ function validateUserIds($conn, $user_ids) {
             color: #e74c3c;
             font-size: 14px;
             margin-top: 5px;
+            display: none;
         }
         
         .success-message {
@@ -277,7 +289,7 @@ function validateUserIds($conn, $user_ids) {
             }
             
             .container {
-                margin: 10px;
+                margin: 15px;
                 padding: 20px;
             }
         }

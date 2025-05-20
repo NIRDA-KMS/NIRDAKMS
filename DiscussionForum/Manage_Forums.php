@@ -1,6 +1,6 @@
 <?php
 require_once('../SchedureEvent/connect.php');
-require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
+// require_once __DIR__ . '/../Internees_task/auth/auth_check.php';
 ?>
 
 <!DOCTYPE html>
