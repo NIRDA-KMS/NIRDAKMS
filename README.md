@@ -2,7 +2,7 @@
 
 **📌 Introduction**
 
-****🔹 Background****
+**🔹 Background**
 
 The NIRDA Knowledge Management System is a platform designed to streamline knowledge sharing and digital collaboration within the organization. It currently includes modules like Document Management, Search, Analytics, User Management, and more.
 
@@ -24,7 +24,7 @@ Chat Management
 
 **🧑‍💻 Developer Guidelines**
 
-****🔧 Key Responsibilities****
+**🔧 Key Responsibilities**
 
 Implement the Collaboration Module as per requirements.
 
@@ -53,7 +53,7 @@ Frontend: HTML5, CSS3, JavaScript (ES6+)
 
 Server: XAMPP (Apache, PHP, MySQL)
 
-**🔎 Tools & Standards**
+**🔎 Tools \& Standards**
 
 IDEs: VS Code, PhpStorm, Sublime Text, Notepad++
 
@@ -61,9 +61,9 @@ PHP Coding: PSR-12
 
 JavaScript Linting: ESLint
 
-Comments & Readability: Mandatory
+Comments \& Readability: Mandatory
 
-**🕒 Time & Learning**
+**🕒 Time \& Learning**
 
 Break components into manageable tasks
 
@@ -71,9 +71,9 @@ Research before implementing new features
 
 Utilize learning platforms and allocate daily learning time
 
-**🛡️ Security & Performance**
+**🛡️ Security \& Performance**
 
-Prepared statements & CSRF protection
+Prepared statements \& CSRF protection
 
 Input sanitization and HTTPS usage (even locally)
 
@@ -87,7 +87,7 @@ Cross-device and cross-browser compatibility
 
 **✅ Testing**
 
-Unit & integration tests
+Unit \& integration tests
 
 UAT and performance benchmarking
 
@@ -110,30 +110,30 @@ Icons: Font Awesome v6.1.1
 **🧩 Component Breakdown**
 
 1. Event Management
-Create Event: Title, datetime, location, description, attendees, reminders, recurrence.
+   Create Event: Title, datetime, location, description, attendees, reminders, recurrence.
 
-Manage Events: List & calendar views, edit/delete/deactivate events, view attendees, send reminders.
+Manage Events: List \& calendar views, edit/delete/deactivate events, view attendees, send reminders.
 
 2. Discussion Forum
-Create Forum: Category name, description, access settings.
+   Create Forum: Category name, description, access settings.
 
 Manage Forums: Create topics, moderate content, pin topics, subscriptions, notifications.
 
 3. Collaborative Projects
-Create Projects: Project details, members, roles, objectives.
+   Create Projects: Project details, members, roles, objectives.
 
 Manage Projects: Kanban tasks, file sharing, timeline (Gantt), reporting.
 
 Member Management: Invite/remove members, assign roles, track activities.
 
 4. Chat Management
-Contacts & Groups: Online/offline status, grouping, searching, blocking.
+   Contacts \& Groups: Online/offline status, grouping, searching, blocking.
 
 Chat Types: Private, group, starred.
 
 Chat Management: Edit/delete messages, media sharing, read receipts, typing indicators.
 
-**🔗 Integration & Testing**
+**🔗 Integration \& Testing**
 
 Use consistent API patterns
 
@@ -154,3 +154,6 @@ Challenges faced and solutions implemented
 **📣 Communication**
 
 Maintain open and consistent communication with the supervisor throughout the development cycle for feedback, clarification, and updates.
+
+alright reserved by NIRDA Internee working internship from 23 march to 23 may 2025
+
